@@ -17,12 +17,14 @@ variables:
 
 steps:
 
-# Install Terraform CLI
+# Step 1: Install Terraform CLI
 - task: Bash@3
   displayName: "Install Terraform CLI"
   inputs:
     targetType: 'inline'
     script: |
+      echo "Cleaning old terraform binary if exists..."
+      sudo rm -f /usr/local/bin/terraform
       echo "Downloading Terraform version $(terraformVersion)..."
       curl -sLo terraform.zip https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip
       unzip -o terraform.zip
@@ -30,7 +32,7 @@ steps:
       sudo mv terraform /usr/local/bin/
       terraform version
 
-# Terraform Init
+# Step 2: Terraform Init
 - task: Bash@3
   displayName: "Terraform Init"
   inputs:
@@ -39,7 +41,7 @@ steps:
       cd $(terraform_folder)
       terraform init
 
-# Terraform Plan
+# Step 3: Terraform Plan
 - task: Bash@3
   displayName: "Terraform Plan"
   inputs:
@@ -52,7 +54,7 @@ steps:
         -var="vm_name=$(vm_name)" \
         -var="ssh_public_key=$(ssh_public_key)"
 
-# Terraform Apply
+# Step 4: Terraform Apply
 - task: Bash@3
   displayName: "Terraform Apply"
   inputs:
@@ -66,7 +68,7 @@ steps:
         -var="ssh_public_key=$(ssh_public_key)" \
         -auto-approve
 
-# Install Ansible & run playbook (example)
+# Step 5: Ansible install and run playbook
 - task: Bash@3
   displayName: "Install Ansible & Run Playbook"
   inputs:
