@@ -6,67 +6,81 @@ trigger:
 variables:
   resource_group: "demo-rg"
   vm_name: "demo-vm"
-  location: "westeurope"
-  ssh_public_key: "$(SSH_PUBLIC_KEY)"  # Stored securely in pipeline
+  location: "westeurope" # use "westeurope" for eu-west
 
 stages:
   - stage: Terraform
     displayName: "Terraform Deployment"
     jobs:
       - job: TerraformInitPlanApply
+        displayName: "Run Terraform Steps"
         pool:
           vmImage: ubuntu-latest
         steps:
           - checkout: self
 
-          - script: |
-              terraform version
-            displayName: "Use Preinstalled Terraform"
+          - task: Bash@3
+            displayName: "Install Terraform CLI"
+            inputs:
+              targetType: 'inline'
+              script: |
+                curl -sLo terraform.zip https://releases.hashicorp.com/terraform/1.6.6/terraform_1.6.6_linux_amd64.zip
+                unzip terraform.zip
+                sudo mv terraform /usr/local/bin/
+                terraform -version
 
-          - script: |
-              cd terraform
-              terraform init
+          - task: Bash@3
             displayName: "Terraform Init"
+            inputs:
+              targetType: 'inline'
+              script: |
+                cd terraform
+                terraform init
 
-          - script: |
-              cd terraform
-              terraform plan \
-                -var="location=$(location)" \
-                -var="resource_group_name=$(resource_group)" \
-                -var="vm_name=$(vm_name)" \
-                -var="ssh_public_key=ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDSgIiTUaJttDCYf0wLHqiSnq00iwH5RFFa8ukJiug+qdK0kgjKgtoABgJxF3nyXKoaFEuEq1+90ZtqEt7oQGMSaFGryhggGrNOdPSq3ZuLqlpBiiiH1aSQHxmPkOjLUR4y2jIh6pXL4VvEHRvXrf6woFeU+17wWalo+22RUs1iTvvJvBac9UytDnv6vIjujr4ALGqL9eBnss6Kk/dOifWx0lutFMJxTDYXOPtUOKuSBn3ZX+HGNtLHb2KViL29jbpqwu0kF23KBpUeds8YIYvKJkRci8S8s2U+WQliDqYzRGC87qCEYh43nS+5owGIeYTl3xt2tZFR0EjPdTm7s2Me+z6Pr7JYd17Q9E+m4cC0a+MQK3W/cOVl4/zD+2K5y1bfMovQ2OK2Bz/lyvsE29jtauL9ULa8KZ/81szYc9vV6dPD6602gdZ0Q5WwCE7jvzzC0ZfJeZ//Jtt4jlGc8Gg2av9QITvEMxmGEQDltPB4E9SIrodyrIV/CarXPteYQWyAAg+I1Nf+nX7esalLVAmincxnCW3YstZaO50N1djMd65ulaIJIrjoTbPVia9YKixeQAKb9RyFhkp6OjNNrNOD9GSyBNrT2bfBrqQ4LrRiPedRHEttX64lBJesxNImeCbpl96cqnAR+mHYG+78I4EzLL/6JTVI/M6dG3gvijho6Q== gauravmadaan143@gmail.com"
+          - task: Bash@3
             displayName: "Terraform Plan"
+            inputs:
+              targetType: 'inline'
+              script: |
+                cd terraform
+                terraform plan \
+                  -var="location=$(location)" \
+                  -var="resource_group_name=$(resource_group)" \
+                  -var="vm_name=$(vm_name)" \
+                  -var="ssh_public_key=ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDSgIiTUaJttDCYf0wLHqiSnq00iwH5RFFa8ukJiug+qdK0kgjKgtoABgJxF3nyXKoaFEuEq1+90ZtqEt7oQGMSaFGryhggGrNOdPSq3ZuLqlpBiiiH1aSQHxmPkOjLUR4y2jIh6pXL4VvEHRvXrf6woFeU+17wWalo+22RUs1iTvvJvBac9UytDnv6vIjujr4ALGqL9eBnss6Kk/dOifWx0lutFMJxTDYXOPtUOKuSBn3ZX+HGNtLHb2KViL29jbpqwu0kF23KBpUeds8YIYvKJkRci8S8s2U+WQliDqYzRGC87qCEYh43nS+5owGIeYTl3xt2tZFR0EjPdTm7s2Me+z6Pr7JYd17Q9E+m4cC0a+MQK3W/cOVl4/zD+2K5y1bfMovQ2OK2Bz/lyvsE29jtauL9ULa8KZ/81szYc9vV6dPD6602gdZ0Q5WwCE7jvzzC0ZfJeZ//Jtt4jlGc8Gg2av9QITvEMxmGEQDltPB4E9SIrodyrIV/CarXPteYQWyAAg+I1Nf+nX7esalLVAmincxnCW3YstZaO50N1djMd65ulaIJIrjoTbPVia9YKixeQAKb9RyFhkp6OjNNrNOD9GSyBNrT2bfBrqQ4LrRiPedRHEttX64lBJesxNImeCbpl96cqnAR+mHYG+78I4EzLL/6JTVI/M6dG3gvijho6Q== gauravmadaan143@gmail.com"
 
-          - script: |
-              cd terraform
-              terraform apply -auto-approve \
-                -var="location=$(location)" \
-                -var="resource_group_name=$(resource_group)" \
-                -var="vm_name=$(vm_name)" \
-                -var="ssh_public_key=ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDSgIiTUaJttDCYf0wLHqiSnq00iwH5RFFa8ukJiug+qdK0kgjKgtoABgJxF3nyXKoaFEuEq1+90ZtqEt7oQGMSaFGryhggGrNOdPSq3ZuLqlpBiiiH1aSQHxmPkOjLUR4y2jIh6pXL4VvEHRvXrf6woFeU+17wWalo+22RUs1iTvvJvBac9UytDnv6vIjujr4ALGqL9eBnss6Kk/dOifWx0lutFMJxTDYXOPtUOKuSBn3ZX+HGNtLHb2KViL29jbpqwu0kF23KBpUeds8YIYvKJkRci8S8s2U+WQliDqYzRGC87qCEYh43nS+5owGIeYTl3xt2tZFR0EjPdTm7s2Me+z6Pr7JYd17Q9E+m4cC0a+MQK3W/cOVl4/zD+2K5y1bfMovQ2OK2Bz/lyvsE29jtauL9ULa8KZ/81szYc9vV6dPD6602gdZ0Q5WwCE7jvzzC0ZfJeZ//Jtt4jlGc8Gg2av9QITvEMxmGEQDltPB4E9SIrodyrIV/CarXPteYQWyAAg+I1Nf+nX7esalLVAmincxnCW3YstZaO50N1djMd65ulaIJIrjoTbPVia9YKixeQAKb9RyFhkp6OjNNrNOD9GSyBNrT2bfBrqQ4LrRiPedRHEttX64lBJesxNImeCbpl96cqnAR+mHYG+78I4EzLL/6JTVI/M6dG3gvijho6Q== gauravmadaan143@gmail.com"
+          - task: Bash@3
             displayName: "Terraform Apply"
+            inputs:
+              targetType: 'inline'
+              script: |
+                cd terraform
+                terraform apply \
+                  -var="location=$(location)" \
+                  -var="resource_group_name=$(resource_group)" \
+                  -var="vm_name=$(vm_name)" \
+                  -var="ssh_public_key=ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDSgIiTUaJttDCYf0wLHqiSnq00iwH5RFFa8ukJiug+qdK0kgjKgtoABgJxF3nyXKoaFEuEq1+90ZtqEt7oQGMSaFGryhggGrNOdPSq3ZuLqlpBiiiH1aSQHxmPkOjLUR4y2jIh6pXL4VvEHRvXrf6woFeU+17wWalo+22RUs1iTvvJvBac9UytDnv6vIjujr4ALGqL9eBnss6Kk/dOifWx0lutFMJxTDYXOPtUOKuSBn3ZX+HGNtLHb2KViL29jbpqwu0kF23KBpUeds8YIYvKJkRci8S8s2U+WQliDqYzRGC87qCEYh43nS+5owGIeYTl3xt2tZFR0EjPdTm7s2Me+z6Pr7JYd17Q9E+m4cC0a+MQK3W/cOVl4/zD+2K5y1bfMovQ2OK2Bz/lyvsE29jtauL9ULa8KZ/81szYc9vV6dPD6602gdZ0Q5WwCE7jvzzC0ZfJeZ//Jtt4jlGc8Gg2av9QITvEMxmGEQDltPB4E9SIrodyrIV/CarXPteYQWyAAg+I1Nf+nX7esalLVAmincxnCW3YstZaO50N1djMd65ulaIJIrjoTbPVia9YKixeQAKb9RyFhkp6OjNNrNOD9GSyBNrT2bfBrqQ4LrRiPedRHEttX64lBJesxNImeCbpl96cqnAR+mHYG+78I4EzLL/6JTVI/M6dG3gvijho6Q== gauravmadaan143@gmail.com" \
+                  -auto-approve
 
   - stage: Ansible
     displayName: "Run Ansible"
     dependsOn: Terraform
     jobs:
       - job: RunAnsible
+        displayName: "Run Ansible Playbook"
         pool:
           vmImage: ubuntu-latest
         steps:
           - checkout: self
 
-          - script: |
-              sudo apt-get update
-              sudo apt-get install -y ansible jq sshpass
-
-              cd terraform
-              VM_IP=$(terraform output -raw vm_public_ip)
-              echo "Provisioned VM IP: $VM_IP"
-
-              cd ..
-              ansible-playbook -i "$VM_IP," ansible/playbook.yml \
-                --user azureuser \
-                --private-key ~/.ssh/id_rsa \
-                --ssh-extra-args="-o StrictHostKeyChecking=no"
+          - task: Bash@3
             displayName: "Run Ansible Playbook"
+            inputs:
+              targetType: 'inline'
+              script: |
+                sudo apt-get update
+                sudo apt-get install -y ansible
+                ansible-playbook -i '<VM_PUBLIC_IP>,' ansible/playbook.yml \
+                  --user azureuser \
+                  --extra-vars "ansible_password='P@ssword1234!'" \
+                  --ssh-extra-args='-o StrictHostKeyChecking=no'
