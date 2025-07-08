@@ -34,7 +34,7 @@ stages:
                 -var="location=$(location)" \
                 -var="resource_group_name=$(resource_group)" \
                 -var="vm_name=$(vm_name)" \
-                -var="ssh_public_key=$(ssh_public_key)"
+                -var="ssh_public_key=ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDSgIiTUaJttDCYf0wLHqiSnq00iwH5RFFa8ukJiug+qdK0kgjKgtoABgJxF3nyXKoaFEuEq1+90ZtqEt7oQGMSaFGryhggGrNOdPSq3ZuLqlpBiiiH1aSQHxmPkOjLUR4y2jIh6pXL4VvEHRvXrf6woFeU+17wWalo+22RUs1iTvvJvBac9UytDnv6vIjujr4ALGqL9eBnss6Kk/dOifWx0lutFMJxTDYXOPtUOKuSBn3ZX+HGNtLHb2KViL29jbpqwu0kF23KBpUeds8YIYvKJkRci8S8s2U+WQliDqYzRGC87qCEYh43nS+5owGIeYTl3xt2tZFR0EjPdTm7s2Me+z6Pr7JYd17Q9E+m4cC0a+MQK3W/cOVl4/zD+2K5y1bfMovQ2OK2Bz/lyvsE29jtauL9ULa8KZ/81szYc9vV6dPD6602gdZ0Q5WwCE7jvzzC0ZfJeZ//Jtt4jlGc8Gg2av9QITvEMxmGEQDltPB4E9SIrodyrIV/CarXPteYQWyAAg+I1Nf+nX7esalLVAmincxnCW3YstZaO50N1djMd65ulaIJIrjoTbPVia9YKixeQAKb9RyFhkp6OjNNrNOD9GSyBNrT2bfBrqQ4LrRiPedRHEttX64lBJesxNImeCbpl96cqnAR+mHYG+78I4EzLL/6JTVI/M6dG3gvijho6Q== gauravmadaan143@gmail.com"
             displayName: "Terraform Plan"
 
           - script: |
