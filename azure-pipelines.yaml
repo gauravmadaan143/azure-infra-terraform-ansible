@@ -7,7 +7,7 @@ variables:
   resource_group: "demo-rg"
   vm_name: "demo-vm"
   location: "westeurope"
-  ssh_public_key: "$(SSH_PUBLIC_KEY)"  # Set this as a secret in Azure DevOps
+  ssh_public_key: "$(SSH_PUBLIC_KEY)"  # Set this securely in pipeline variables
 
 stages:
   - stage: Terraform
@@ -21,8 +21,13 @@ stages:
           - checkout: self
 
           - script: |
+              sudo apt-get update
+              sudo apt-get install -y unzip wget curl
+              wget https://releases.hashicorp.com/terraform/1.6.6/terraform_1.6.6_linux_amd64.zip -O terraform.zip
+              unzip terraform.zip
+              sudo mv terraform /usr/local/bin/
               terraform -version
-            displayName: "Check Terraform Version (Preinstalled)"
+            displayName: "Install Terraform CLI"
 
           - script: |
               cd terraform
