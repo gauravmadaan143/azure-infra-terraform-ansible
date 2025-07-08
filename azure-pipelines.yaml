@@ -17,83 +17,113 @@ variables:
 
 stages:
 
-# ─────────── Stage 1 ───────────
-- stage: Init
-  displayName: "Terraform Init"
+- stage: TerraformPipeline
+  displayName: "Terraform Pipeline"
   jobs:
-    - job: InitJob
+
+    - job: TerraformInstall
+      displayName: "Install Terraform CLI"
       steps:
         - checkout: self
-
         - task: Bash@3
           displayName: "Install Terraform CLI"
           inputs:
             targetType: 'inline'
             script: |
-              rm -rf terraform terraform.zip
+              rm -f terraform.zip
               curl -sLo terraform.zip https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip
               unzip terraform.zip
               chmod +x terraform
               sudo mv terraform /usr/local/bin/
               terraform version
+
+    - job: TerraformInit
+      displayName: "Terraform Init"
+      dependsOn: TerraformInstall
+      steps:
+        - checkout: self
+        - task: Bash@3
+          displayName: "Install Terraform CLI"
+          inputs:
+            targetType: 'inline'
+            script: |
+              rm -f terraform.zip
+              curl -sLo terraform.zip https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip
+              unzip terraform.zip
+              chmod +x terraform
+              sudo mv terraform /usr/local/bin/
+              terraform version
+
+        - task: Bash@3
+          displayName: "Verify Terraform Folder and cd"
+          inputs:
+            targetType: 'inline'
+            script: |
+              if [ ! -d "$(terraform_folder)" ]; then
+                echo "ERROR: Terraform folder '$(terraform_folder)' does not exist!"
+                ls -la
+                exit 1
+              fi
+              cd $(terraform_folder)
 
         - task: Bash@3
           displayName: "Terraform Init"
           inputs:
             targetType: 'inline'
-            script: |
-              cd $(terraform_folder)
-              terraform init
+            script: terraform init
 
-# ─────────── Stage 2 ───────────
-- stage: Plan
-  displayName: "Terraform Plan"
-  dependsOn: Init
-  jobs:
-    - job: PlanJob
+    - job: TerraformPlan
+      displayName: "Terraform Plan"
+      dependsOn: TerraformInit
       steps:
         - checkout: self
-
         - task: Bash@3
           displayName: "Install Terraform CLI"
           inputs:
             targetType: 'inline'
             script: |
-              rm -rf terraform terraform.zip
+              rm -f terraform.zip
               curl -sLo terraform.zip https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip
               unzip terraform.zip
               chmod +x terraform
               sudo mv terraform /usr/local/bin/
               terraform version
+
+        - task: Bash@3
+          displayName: "Verify Terraform Folder and cd"
+          inputs:
+            targetType: 'inline'
+            script: |
+              if [ ! -d "$(terraform_folder)" ]; then
+                echo "ERROR: Terraform folder '$(terraform_folder)' does not exist!"
+                ls -la
+                exit 1
+              fi
+              cd $(terraform_folder)
 
         - task: Bash@3
           displayName: "Terraform Plan"
           inputs:
             targetType: 'inline'
             script: |
-              cd $(terraform_folder)
               terraform plan \
                 -var="location=$(location)" \
                 -var="resource_group_name=$(resource_group)" \
                 -var="vm_name=$(vm_name)" \
                 -var="ssh_public_key=$(ssh_public_key)"
 
-# ─────────── Stage 3 ───────────
-- stage: Apply
-  displayName: "Terraform Apply"
-  dependsOn: Plan
-  condition: succeeded()
-  jobs:
-    - job: ApplyJob
+    - job: TerraformApply
+      displayName: "Terraform Apply"
+      dependsOn: TerraformPlan
+      condition: succeeded()
       steps:
         - checkout: self
-
         - task: Bash@3
           displayName: "Install Terraform CLI"
           inputs:
             targetType: 'inline'
             script: |
-              rm -rf terraform terraform.zip
+              rm -f terraform.zip
               curl -sLo terraform.zip https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip
               unzip terraform.zip
               chmod +x terraform
@@ -101,11 +131,22 @@ stages:
               terraform version
 
         - task: Bash@3
+          displayName: "Verify Terraform Folder and cd"
+          inputs:
+            targetType: 'inline'
+            script: |
+              if [ ! -d "$(terraform_folder)" ]; then
+                echo "ERROR: Terraform folder '$(terraform_folder)' does not exist!"
+                ls -la
+                exit 1
+              fi
+              cd $(terraform_folder)
+
+        - task: Bash@3
           displayName: "Terraform Apply"
           inputs:
             targetType: 'inline'
             script: |
-              cd $(terraform_folder)
               terraform apply \
                 -var="location=$(location)" \
                 -var="resource_group_name=$(resource_group)" \
@@ -113,10 +154,9 @@ stages:
                 -var="ssh_public_key=$(ssh_public_key)" \
                 -auto-approve
 
-# ─────────── Stage 4 ───────────
 - stage: ConfigureNginx
   displayName: "Configure NGINX via Ansible"
-  dependsOn: Apply
+  dependsOn: TerraformPipeline
   condition: succeeded()
   jobs:
     - job: AnsibleJob
@@ -129,14 +169,24 @@ stages:
           inputs:
             targetType: 'inline'
             script: |
-              sudo apt update
-              sudo apt install -y ansible
+              sudo apt-get update
+              sudo apt-get install -y ansible
               ansible --version
+
+        - task: Bash@3
+          displayName: "Verify Ansible Folder and cd"
+          inputs:
+            targetType: 'inline'
+            script: |
+              if [ ! -d "$(ansible_folder)" ]; then
+                echo "ERROR: Ansible folder '$(ansible_folder)' does not exist!"
+                ls -la
+                exit 1
+              fi
+              cd $(ansible_folder)
 
         - task: Bash@3
           displayName: "Run NGINX Playbook"
           inputs:
             targetType: 'inline'
-            script: |
-              cd $(ansible_folder)
-              ansible-playbook -i inventory site.yml
+            script: ansible-playbook -i inventory site.yml
