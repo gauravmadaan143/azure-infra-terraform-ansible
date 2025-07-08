@@ -6,28 +6,26 @@ trigger:
 variables:
   resource_group: "demo-rg"
   vm_name: "demo-vm"
-  location: "westeurope" # use "westeurope" for eu-west
+  location: "westeurope"
+  ssh_public_key: "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCyour_real_key_here" # replace this
 
 stages:
   - stage: Terraform
     displayName: "Terraform Deployment"
     jobs:
       - job: TerraformInitPlanApply
-        displayName: "Run Terraform Steps"
+        displayName: "Terraform Init/Plan/Apply"
         pool:
           vmImage: ubuntu-latest
         steps:
           - checkout: self
 
           - task: Bash@3
-            displayName: "Install Terraform CLI"
+            displayName: "Terraform Version Check"
             inputs:
               targetType: 'inline'
               script: |
-                curl -sLo terraform.zip https://releases.hashicorp.com/terraform/1.6.6/terraform_1.6.6_linux_amd64.zip
-                unzip terraform.zip
-                sudo mv terraform /usr/local/bin/
-                terraform -version
+                terraform version
 
           - task: Bash@3
             displayName: "Terraform Init"
@@ -63,7 +61,7 @@ stages:
                   -auto-approve
 
   - stage: Ansible
-    displayName: "Run Ansible"
+    displayName: "Ansible Configuration"
     dependsOn: Terraform
     jobs:
       - job: RunAnsible
@@ -74,7 +72,7 @@ stages:
           - checkout: self
 
           - task: Bash@3
-            displayName: "Run Ansible Playbook"
+            displayName: "Install & Run Ansible"
             inputs:
               targetType: 'inline'
               script: |
