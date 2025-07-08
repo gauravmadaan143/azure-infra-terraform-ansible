@@ -6,22 +6,28 @@ trigger:
 variables:
   resource_group: "demo-rg"
   vm_name: "demo-vm"
-  location: "westeurope"
+  location: "westeurope"  # Adjust if needed
+  ssh_public_key: "$(SSH_PUBLIC_KEY)"  # Defined as secret in pipeline
 
 stages:
   - stage: Terraform
+    displayName: "Terraform Deployment"
     jobs:
       - job: TerraformInitPlanApply
+        displayName: "Run Terraform"
         pool:
           vmImage: ubuntu-latest
         steps:
           - checkout: self
+
           - script: |
-              curl -sLo terraform.zip https://releases.hashicorp.com/terraform/1.6.6/terraform_1.6.6_linux_amd64.zip
-              unzip terraform.zip
+              sudo apt-get update
+              sudo apt-get install -y unzip wget
+              wget https://releases.hashicorp.com/terraform/1.6.6/terraform_1.6.6_linux_amd64.zip
+              unzip terraform_1.6.6_linux_amd64.zip
               sudo mv terraform /usr/local/bin/
               terraform -version
-            displayName: "Install Terraform"
+            displayName: "Install Terraform CLI"
 
           - script: |
               cd terraform
@@ -30,27 +36,44 @@ stages:
 
           - script: |
               cd terraform
-              terraform plan -var="location=$(location)" -var="resource_group_name=$(resource_group)" -var="vm_name=$(vm_name)" -var="ssh_public_key=$(SSH_PUBLIC_KEY)"
+              terraform plan \
+                -var="location=$(location)" \
+                -var="resource_group_name=$(resource_group)" \
+                -var="vm_name=$(vm_name)" \
+                -var="ssh_public_key=$(ssh_public_key)"
             displayName: "Terraform Plan"
 
           - script: |
               cd terraform
-              terraform apply -auto-approve -var="location=$(location)" -var="resource_group_name=$(resource_group)" -var="vm_name=$(vm_name)" -var="ssh_public_key=$(SSH_PUBLIC_KEY)"
+              terraform apply -auto-approve \
+                -var="location=$(location)" \
+                -var="resource_group_name=$(resource_group)" \
+                -var="vm_name=$(vm_name)" \
+                -var="ssh_public_key=$(ssh_public_key)"
             displayName: "Terraform Apply"
 
   - stage: Ansible
+    displayName: "Run Ansible on Provisioned VM"
     dependsOn: Terraform
     jobs:
       - job: RunAnsible
+        displayName: "Configure VM via Ansible"
         pool:
           vmImage: ubuntu-latest
         steps:
           - checkout: self
+
           - script: |
               sudo apt-get update
-              sudo apt-get install -y ansible sshpass
-              VM_IP=$(terraform output -raw vm_public_ip)
-              echo "VM IP: $VM_IP"
-              ansible-playbook -i "$VM_IP," ansible/playbook.yml --user azureuser --private-key ~/.ssh/id_rsa --ssh-extra-args='-o StrictHostKeyChecking=no'
-            displayName: "Run Ansible Playbook"
+              sudo apt-get install -y ansible jq sshpass
 
+              cd terraform
+              VM_IP=$(terraform output -raw vm_public_ip)
+              echo "Provisioned VM IP: $VM_IP"
+
+              cd ..
+              ansible-playbook -i "$VM_IP," ansible/playbook.yml \
+                --user azureuser \
+                --private-key ~/.ssh/id_rsa \
+                --ssh-extra-args="-o StrictHostKeyChecking=no"
+            displayName: "Run Ansible Playbook"
