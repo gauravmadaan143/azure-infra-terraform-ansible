@@ -6,28 +6,23 @@ trigger:
 variables:
   resource_group: "demo-rg"
   vm_name: "demo-vm"
-  location: "westeurope"  # Adjust if needed
-  ssh_public_key: "$(SSH_PUBLIC_KEY)"  # Defined as secret in pipeline
+  location: "westeurope"
+  ssh_public_key: "$(SSH_PUBLIC_KEY)"  # Set this as a secret in Azure DevOps
 
 stages:
   - stage: Terraform
     displayName: "Terraform Deployment"
     jobs:
       - job: TerraformInitPlanApply
-        displayName: "Run Terraform"
+        displayName: "Run Terraform Steps"
         pool:
           vmImage: ubuntu-latest
         steps:
           - checkout: self
 
           - script: |
-              sudo apt-get update
-              sudo apt-get install -y unzip wget
-              wget https://releases.hashicorp.com/terraform/1.6.6/terraform_1.6.6_linux_amd64.zip
-              unzip terraform_1.6.6_linux_amd64.zip
-              sudo mv terraform /usr/local/bin/
               terraform -version
-            displayName: "Install Terraform CLI"
+            displayName: "Check Terraform Version (Preinstalled)"
 
           - script: |
               cd terraform
@@ -53,7 +48,7 @@ stages:
             displayName: "Terraform Apply"
 
   - stage: Ansible
-    displayName: "Run Ansible on Provisioned VM"
+    displayName: "Run Ansible"
     dependsOn: Terraform
     jobs:
       - job: RunAnsible
