@@ -32,23 +32,6 @@ jobs:
       inputs:
         terraformVersion: "$(terraformVersion)"
 
-<<<<<<< HEAD
-=======
-    # ✅ Export Service Principal ARM_* vars
-    - task: AzureCLI@2
-      displayName: "Export ARM_* env vars from Service Principal"
-      inputs:
-        azureSubscription: 'terraform-spn'  # 🔁 Replace with your service connection name
-        scriptType: bash
-        scriptLocation: inlineScript
-        inlineScript: |
-          echo "##vso[task.setvariable variable=ARM_CLIENT_ID]$servicePrincipalId"
-          echo "##vso[task.setvariable variable=ARM_CLIENT_SECRET]$servicePrincipalKey"
-          echo "##vso[task.setvariable variable=ARM_SUBSCRIPTION_ID]$subscriptionId"
-          echo "##vso[task.setvariable variable=ARM_TENANT_ID]$tenantId"
-
-    # ✅ Terraform Init with backend config
->>>>>>> 9d2282d79a552c735c7639d76bca6517142f5419
     - task: Bash@3
       displayName: "Terraform Init"
       env:
@@ -62,10 +45,6 @@ jobs:
           cd $(Build.SourcesDirectory)/$(terraform_folder)
           terraform init
 
-<<<<<<< HEAD
-=======
-    # ✅ Terraform Plan with SP credentials
->>>>>>> 9d2282d79a552c735c7639d76bca6517142f5419
     - task: Bash@3
       displayName: "Terraform Plan"
       env:
@@ -82,10 +61,6 @@ jobs:
             -var="resource_group_name=$(resource_group_name)" \
             -var="vm_name=$(vm_name)" \
             -var="ssh_public_key=$(ssh_public_key)" \
-<<<<<<< HEAD
-=======
-            -var="my_ip_address=$(my_ip_address)" \
->>>>>>> 9d2282d79a552c735c7639d76bca6517142f5419
             -var="client_id=$(ARM_CLIENT_ID)" \
             -var="client_secret=$(ARM_CLIENT_SECRET)" \
             -var="subscription_id=$(ARM_SUBSCRIPTION_ID)" \
@@ -107,19 +82,11 @@ jobs:
             -var="resource_group_name=$(resource_group_name)" \
             -var="vm_name=$(vm_name)" \
             -var="ssh_public_key=$(ssh_public_key)" \
-<<<<<<< HEAD
-=======
-            -var="my_ip_address=$(my_ip_address)" \
->>>>>>> 9d2282d79a552c735c7639d76bca6517142f5419
             -var="client_id=$(ARM_CLIENT_ID)" \
             -var="client_secret=$(ARM_CLIENT_SECRET)" \
             -var="subscription_id=$(ARM_SUBSCRIPTION_ID)" \
             -var="tenant_id=$(ARM_TENANT_ID)"
 
-<<<<<<< HEAD
-=======
-    # ✅ Optional: Install & Run Ansible Playbook
->>>>>>> 9d2282d79a552c735c7639d76bca6517142f5419
     - task: Bash@3
       displayName: "Install & Run Ansible"
       inputs:
@@ -129,4 +96,3 @@ jobs:
           sudo apt-get install -y ansible
           cd $(Build.SourcesDirectory)/$(ansible_folder)
           ansible-playbook -i inventory playbook.yaml
-
