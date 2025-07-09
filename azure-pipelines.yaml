@@ -1,5 +1,7 @@
 trigger:
-- main
+  branches:
+    include:
+      - main
 
 pool:
   vmImage: 'ubuntu-latest'
@@ -8,10 +10,14 @@ variables:
   terraformVersion: '1.6.6'
   terraform_folder: 'terraform'
   ansible_folder: 'ansible'
+  resource_group: 'demo-rg'
+  vm_name: 'demo-vm'
+  location: 'westeurope'
+  ssh_public_key: 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDSgIiTUa...your_key_here...'
 
 stages:
 
-# ─────────── Stage 1: Install Terraform CLI ───────────
+# 1. Install Terraform CLI Locally
 - stage: InstallTerraform
   displayName: "Install Terraform CLI"
   jobs:
@@ -21,97 +27,91 @@ stages:
         - checkout: self
         - bash: |
             set -e
-
-            echo "Installing Terraform version $(terraformVersion)..."
+            echo "Downloading Terraform $(terraformVersion)..."
             rm -rf terraform terraform.zip
-
-            # Download
-            curl -sSLo terraform.zip \
-              https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip
-
-            # Validate ZIP before unzip
-            if ! unzip -t terraform.zip >/dev/null 2>&1; then
-              echo "❌ Invalid ZIP file downloaded!"
-              head -n50 terraform.zip
-              exit 1
-            fi
-
-            # Extract and install locally
+            curl -sSLo terraform.zip https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip
             unzip -o terraform.zip
             chmod +x terraform
             mkdir -p $HOME/bin
-            mv terraform $HOME/bin/
-            echo "##vso[task.prependpath]$HOME/bin"
+            mv terraform $HOME/bin/terraform
+            rm terraform.zip
+            echo "✅ Installed: $HOME/bin/terraform"
+            $HOME/bin/terraform -version
+          displayName: "Install Terraform CLI"
 
-            echo "✅ Terraform installed:"
-            terraform -version
-          displayName: "Install Terraform CLI with Validation"
-
-# ─────────── Stage 2: Terraform Init ───────────
+# 2. Terraform Init
 - stage: TerraformInit
   displayName: "Terraform Init"
   dependsOn: InstallTerraform
   jobs:
     - job: Init
-      displayName: "Terraform Init"
       steps:
+        - checkout: self
         - bash: |
             set -e
+            echo "Running terraform init..."
             cd $(terraform_folder)
-            terraform init
-          displayName: "Run terraform init"
+            $HOME/bin/terraform init
+          displayName: "terraform init"
 
-# ─────────── Stage 3: Terraform Plan ───────────
+# 3. Terraform Plan
 - stage: TerraformPlan
   displayName: "Terraform Plan"
   dependsOn: TerraformInit
   jobs:
     - job: Plan
-      displayName: "Terraform Plan"
       steps:
+        - checkout: self
         - bash: |
             set -e
+            echo "Running terraform plan..."
             cd $(terraform_folder)
-            terraform plan \
+            $HOME/bin/terraform plan \
               -var="location=$(location)" \
               -var="resource_group_name=$(resource_group)" \
               -var="vm_name=$(vm_name)" \
               -var="ssh_public_key=$(ssh_public_key)"
-          displayName: "Run terraform plan"
+          displayName: "terraform plan"
 
-# ─────────── Stage 4: Terraform Apply ───────────
+# 4. Terraform Apply
 - stage: TerraformApply
   displayName: "Terraform Apply"
   dependsOn: TerraformPlan
   condition: succeeded()
   jobs:
     - job: Apply
-      displayName: "Terraform Apply"
       steps:
+        - checkout: self
         - bash: |
             set -e
+            echo "Running terraform apply..."
             cd $(terraform_folder)
-            terraform apply -auto-approve \
+            $HOME/bin/terraform apply -auto-approve \
               -var="location=$(location)" \
               -var="resource_group_name=$(resource_group)" \
               -var="vm_name=$(vm_name)" \
               -var="ssh_public_key=$(ssh_public_key)"
-          displayName: "Run terraform apply"
+          displayName: "terraform apply"
 
-# ─────────── Stage 5: Configure NGINX via Ansible ───────────
+# 5. Configure NGINX via Ansible
 - stage: ConfigureNginx
   displayName: "Configure NGINX via Ansible"
   dependsOn: TerraformApply
   condition: succeeded()
   jobs:
     - job: Ansible
-      displayName: "Run Ansible Playbook"
       steps:
+        - checkout: self
         - bash: |
             set -e
+            echo "Installing Ansible..."
             sudo apt-get update
             sudo apt-get install -y ansible
             ansible --version
+          displayName: "Install Ansible"
+        - bash: |
+            set -e
+            echo "Running NGINX playbook..."
             cd $(ansible_folder)
             ansible-playbook -i inventory site.yml
-          displayName: "Install Ansible & Run Playbook"
+          displayName: "Run NGINX Playbook"
