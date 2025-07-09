@@ -1,25 +1,29 @@
 variable "resource_group_name" {
-  default     = "demo-rg"
+  type        = string
   description = "Name of the Azure resource group"
+  default     = "demo-rg"
 }
 
 variable "location" {
-  default     = "westeurope"
+  type        = string
   description = "Azure region"
+  default     = "westeurope"
 }
 
 variable "vm_name" {
-  default     = "demo-vm"
+  type        = string
   description = "Virtual machine name"
+  default     = "demo-vm"
 }
 
 variable "ssh_public_key" {
-  description = "SSH public key"
   type        = string
+  description = "SSH public key used for the Azure VM"
 }
 
 variable "my_ip_address" {
+  type        = string
+  description = "Your current public IP address with CIDR for SSH access"
   default     = "89.64.12.157/32"
-  description = "Your IP for SSH access"
 }
 
