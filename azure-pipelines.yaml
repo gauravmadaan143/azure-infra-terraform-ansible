@@ -56,9 +56,12 @@ jobs:
         ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
         ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
         ARM_TENANT_ID: $(ARM_TENANT_ID)
+        ssh_public_key: $(ssh_public_key) 
       inputs:
         targetType: inline
         script: |
+          echo "SSH Public Key starts with: $(echo $ssh_public_key | cut -c1-40)..."
+          displayName: "Debug SSH public key variable"
           cd $(Build.SourcesDirectory)/$(terraform_folder)
           terraform plan \
             -var="location=$(location)" \
@@ -78,9 +81,12 @@ jobs:
         ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
         ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
         ARM_TENANT_ID: $(ARM_TENANT_ID)
+        ssh_public_key: $(ssh_public_key) 
       inputs:
         targetType: inline
         script: |
+          echo "SSH Public Key starts with: $(echo $ssh_public_key | cut -c1-40)..."
+          displayName: "Debug SSH public key variable"
           cd $(Build.SourcesDirectory)/$(terraform_folder)
           terraform apply -auto-approve \
             -var="location=$(location)" \
