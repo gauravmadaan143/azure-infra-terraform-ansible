@@ -13,7 +13,7 @@ variables:
   location: 'westeurope'
   resource_group: 'demo-rg'
   vm_name: 'demo-vm'
-  ssh_public_key: 'ssh-rsa AAAAB3Nza...YOUR_KEY...== gauravmadaan143@gmail.com'
+  ssh_public_key: 'ssh-rsa AAAAB3...your_full_key_here...'
   my_ip_address: '89.64.12.157/32'
 
 jobs:
@@ -22,17 +22,17 @@ jobs:
   steps:
     - checkout: self
 
-    # ✅ Install Terraform CLI
+    # ✅ Install Terraform
     - task: TerraformInstaller@1
       displayName: "Install Terraform"
       inputs:
         terraformVersion: "$(terraformVersion)"
 
-    # ✅ Export ARM_* variables from Azure Service Connection
+    # ✅ Export Service Principal credentials to env vars
     - task: AzureCLI@2
-      displayName: "Extract ARM credentials"
+      displayName: "Extract ARM_* env vars from Service Principal"
       inputs:
-        azureSubscription: 'terraform-spn'  # 🔁 Replace with your actual service connection name
+        azureSubscription: 'terraform-spn'   # ⚠️ Replace with your real service connection name
         scriptType: bash
         scriptLocation: inlineScript
         inlineScript: |
@@ -41,7 +41,7 @@ jobs:
           echo "##vso[task.setvariable variable=ARM_SUBSCRIPTION_ID]$subscriptionId"
           echo "##vso[task.setvariable variable=ARM_TENANT_ID]$tenantId"
 
-    # ✅ Terraform Init
+    # ✅ Terraform Init with backend config
     - task: Bash@3
       displayName: "Terraform Init"
       env:
@@ -53,7 +53,11 @@ jobs:
         targetType: inline
         script: |
           cd $(Build.SourcesDirectory)/$(terraform_folder)
-          terraform init
+          terraform init \
+            -backend-config="resource_group_name=tfstate-rg" \
+            -backend-config="storage_account_name=gmadantfstate01" \
+            -backend-config="container_name=tfstate" \
+            -backend-config="key=terraform.tfstate"
 
     # ✅ Terraform Plan
     - task: Bash@3
@@ -93,7 +97,7 @@ jobs:
             -var="ssh_public_key=$(ssh_public_key)" \
             -var="my_ip_address=$(my_ip_address)"
 
-    # ✅ Ansible Install & Run
+    # ✅ Optional: Install & Run Ansible playbook
     - task: Bash@3
       displayName: "Install & Run Ansible"
       inputs:
