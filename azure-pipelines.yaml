@@ -1,63 +1,117 @@
 trigger:
 - main
 
+pool:
+  vmImage: 'ubuntu-latest'
+
 variables:
   terraformVersion: '1.6.6'
+  terraform_folder: 'terraform'
+  ansible_folder: 'ansible'
 
 stages:
-- stage: Terraform
-  displayName: "Terraform Deployment"
+
+# ─────────── Stage 1: Install Terraform CLI ───────────
+- stage: InstallTerraform
+  displayName: "Install Terraform CLI"
   jobs:
-  - job: TerraformJob
-    displayName: "Terraform Execution"
-    pool:
-      vmImage: 'ubuntu-latest'
-    steps:
+    - job: InstallTerraform
+      displayName: "Install Terraform"
+      steps:
+        - checkout: self
+        - bash: |
+            set -e
 
-    - bash: |
-        echo "Installing Terraform version ${terraformVersion}"
-        
-        set -e  # Stop on first error
-        mkdir -p $HOME/bin
-        
-        # Download and validate the zip
-        curl -sSLo terraform.zip https://releases.hashicorp.com/terraform/${terraformVersion}/terraform_${terraformVersion}_linux_amd64.zip
-        
-        if ! unzip -t terraform.zip >/dev/null 2>&1; then
-          echo "❌ Invalid ZIP file downloaded!"
-          cat terraform.zip  # Debug contents (likely an HTML error page)
-          exit 1
-        fi
+            echo "Installing Terraform version $(terraformVersion)..."
+            rm -rf terraform terraform.zip
 
-        unzip -o terraform.zip
-        chmod +x terraform
-        mv terraform $HOME/bin/
-        echo "##vso[task.prependpath]$HOME/bin"
+            # Download
+            curl -sSLo terraform.zip \
+              https://releases.hashicorp.com/terraform/$(terraformVersion)/terraform_$(terraformVersion)_linux_amd64.zip
 
-        echo "✅ Terraform installed:"
-        terraform -version
-      displayName: 'Install Terraform CLI with validation'
+            # Validate ZIP before unzip
+            if ! unzip -t terraform.zip >/dev/null 2>&1; then
+              echo "❌ Invalid ZIP file downloaded!"
+              head -n50 terraform.zip
+              exit 1
+            fi
 
-    - bash: terraform init
-      displayName: 'Terraform Init'
+            # Extract and install locally
+            unzip -o terraform.zip
+            chmod +x terraform
+            mkdir -p $HOME/bin
+            mv terraform $HOME/bin/
+            echo "##vso[task.prependpath]$HOME/bin"
 
-    - bash: terraform plan -out=tfplan
-      displayName: 'Terraform Plan'
+            echo "✅ Terraform installed:"
+            terraform -version
+          displayName: "Install Terraform CLI with Validation"
 
-    - bash: terraform apply -auto-approve tfplan
-      displayName: 'Terraform Apply'
-
-- stage: Ansible
-  displayName: "Ansible Deployment"
-  dependsOn: Terraform
+# ─────────── Stage 2: Terraform Init ───────────
+- stage: TerraformInit
+  displayName: "Terraform Init"
+  dependsOn: InstallTerraform
   jobs:
-  - job: AnsibleJob
-    pool:
-      vmImage: 'ubuntu-latest'
-    steps:
-    - bash: |
-        echo "Running Ansible..."
-        sudo apt update && sudo apt install -y ansible
-        # Customize with your playbook/inventory path
-        ansible-playbook site.yml -i inventory
-      displayName: 'Run Ansible Playbook'
+    - job: Init
+      displayName: "Terraform Init"
+      steps:
+        - bash: |
+            set -e
+            cd $(terraform_folder)
+            terraform init
+          displayName: "Run terraform init"
+
+# ─────────── Stage 3: Terraform Plan ───────────
+- stage: TerraformPlan
+  displayName: "Terraform Plan"
+  dependsOn: TerraformInit
+  jobs:
+    - job: Plan
+      displayName: "Terraform Plan"
+      steps:
+        - bash: |
+            set -e
+            cd $(terraform_folder)
+            terraform plan \
+              -var="location=$(location)" \
+              -var="resource_group_name=$(resource_group)" \
+              -var="vm_name=$(vm_name)" \
+              -var="ssh_public_key=$(ssh_public_key)"
+          displayName: "Run terraform plan"
+
+# ─────────── Stage 4: Terraform Apply ───────────
+- stage: TerraformApply
+  displayName: "Terraform Apply"
+  dependsOn: TerraformPlan
+  condition: succeeded()
+  jobs:
+    - job: Apply
+      displayName: "Terraform Apply"
+      steps:
+        - bash: |
+            set -e
+            cd $(terraform_folder)
+            terraform apply -auto-approve \
+              -var="location=$(location)" \
+              -var="resource_group_name=$(resource_group)" \
+              -var="vm_name=$(vm_name)" \
+              -var="ssh_public_key=$(ssh_public_key)"
+          displayName: "Run terraform apply"
+
+# ─────────── Stage 5: Configure NGINX via Ansible ───────────
+- stage: ConfigureNginx
+  displayName: "Configure NGINX via Ansible"
+  dependsOn: TerraformApply
+  condition: succeeded()
+  jobs:
+    - job: Ansible
+      displayName: "Run Ansible Playbook"
+      steps:
+        - bash: |
+            set -e
+            sudo apt-get update
+            sudo apt-get install -y ansible
+            ansible --version
+            cd $(ansible_folder)
+            ansible-playbook -i inventory site.yml
+          displayName: "Install Ansible & Run Playbook"
