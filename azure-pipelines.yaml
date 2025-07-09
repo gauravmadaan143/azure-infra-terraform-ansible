@@ -6,39 +6,49 @@ variables:
 
 stages:
 - stage: Terraform
-  displayName: "Terraform Infrastructure"
+  displayName: "Terraform Deployment"
   jobs:
   - job: TerraformJob
-    displayName: "Run Terraform"
+    displayName: "Terraform Execution"
     pool:
       vmImage: 'ubuntu-latest'
     steps:
+
     - bash: |
-        echo "Installing Terraform locally..."
-        rm -rf terraform terraform.zip
-        curl -sLo terraform.zip https://releases.hashicorp.com/terraform/${terraformVersion}/terraform_${terraformVersion}_linux_amd64.zip
-        unzip terraform.zip
-        chmod +x terraform
+        echo "Installing Terraform version ${terraformVersion}"
+        
+        set -e  # Stop on first error
         mkdir -p $HOME/bin
+        
+        # Download and validate the zip
+        curl -sSLo terraform.zip https://releases.hashicorp.com/terraform/${terraformVersion}/terraform_${terraformVersion}_linux_amd64.zip
+        
+        if ! unzip -t terraform.zip >/dev/null 2>&1; then
+          echo "❌ Invalid ZIP file downloaded!"
+          cat terraform.zip  # Debug contents (likely an HTML error page)
+          exit 1
+        fi
+
+        unzip -o terraform.zip
+        chmod +x terraform
         mv terraform $HOME/bin/
         echo "##vso[task.prependpath]$HOME/bin"
-        terraform -version
-      displayName: 'Install Terraform CLI'
 
-    - bash: |
-        terraform init
+        echo "✅ Terraform installed:"
+        terraform -version
+      displayName: 'Install Terraform CLI with validation'
+
+    - bash: terraform init
       displayName: 'Terraform Init'
 
-    - bash: |
-        terraform plan -out=tfplan
+    - bash: terraform plan -out=tfplan
       displayName: 'Terraform Plan'
 
-    - bash: |
-        terraform apply -auto-approve tfplan
+    - bash: terraform apply -auto-approve tfplan
       displayName: 'Terraform Apply'
 
-- stage: AnsibleDeploy
-  displayName: "Run Ansible Playbook"
+- stage: Ansible
+  displayName: "Ansible Deployment"
   dependsOn: Terraform
   jobs:
   - job: AnsibleJob
@@ -46,9 +56,8 @@ stages:
       vmImage: 'ubuntu-latest'
     steps:
     - bash: |
-        echo "Running Ansible playbook (example)"
-        # Install Ansible (if needed)
-        sudo apt-get update && sudo apt-get install -y ansible
-        # Run your playbook here
-        ansible-playbook your-playbook.yml -i inventory.ini
+        echo "Running Ansible..."
+        sudo apt update && sudo apt install -y ansible
+        # Customize with your playbook/inventory path
+        ansible-playbook site.yml -i inventory
       displayName: 'Run Ansible Playbook'
