@@ -104,9 +104,9 @@ resource "azurerm_linux_virtual_machine" "main" {
   }
 
   source_image_reference {
-    publisher = "Canonical"
-    offer     = "UbuntuServer"
-    sku       = "20_04-lts"
+    publisher = "RedHat"
+    offer     = "RHEL"
+    sku       = "8_8"
     version   = "latest"
   }
 }
