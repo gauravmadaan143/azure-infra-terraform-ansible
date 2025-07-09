@@ -17,11 +17,12 @@ variables:
 
 stages:
 
-# ─────────── Stage 1: Install Terraform ───────────
+# Stage 1: Install Terraform CLI
 - stage: InstallTerraform
   displayName: "Install Terraform CLI"
   jobs:
     - job: InstallTerraformJob
+      displayName: "Install Terraform"
       steps:
         - checkout: self
         - task: Bash@3
@@ -31,33 +32,34 @@ stages:
             script: |
               echo "Cleaning old terraform binary/directory if exists..."
               if [ -d /usr/local/bin/terraform ]; then
-                echo "Removing existing directory /usr/local/bin/terraform"
                 sudo rm -rf /usr/local/bin/terraform
               fi
               if [ -f /usr/local/bin/terraform ]; then
-                echo "Removing existing terraform binary"
                 sudo rm -f /usr/local/bin/terraform
               fi
 
               echo "Downloading Terraform version $(terraform_version)..."
               curl -sLo terraform.zip https://releases.hashicorp.com/terraform/$(terraform_version)/terraform_$(terraform_version)_linux_amd64.zip
 
-              echo "Unzipping Terraform..."
-              unzip -o terraform.zip
+              echo "Unzipping Terraform to temp folder..."
+              mkdir -p temp_terraform
+              unzip -o terraform.zip -d temp_terraform
 
               echo "Moving terraform binary to /usr/local/bin/"
-              sudo mv terraform /usr/local/bin/
+              sudo mv temp_terraform/terraform /usr/local/bin/
 
-              rm terraform.zip
+              echo "Cleaning up..."
+              rm -rf terraform.zip temp_terraform
 
               terraform -version
 
-# ─────────── Stage 2: Terraform Init ───────────
+# Stage 2: Terraform Init
 - stage: TerraformInit
   displayName: "Terraform Init"
   dependsOn: InstallTerraform
   jobs:
     - job: InitJob
+      displayName: "Terraform Init"
       steps:
         - checkout: self
         - task: Bash@3
@@ -68,12 +70,13 @@ stages:
               cd $(terraform_folder)
               terraform init
 
-# ─────────── Stage 3: Terraform Plan ───────────
+# Stage 3: Terraform Plan
 - stage: TerraformPlan
   displayName: "Terraform Plan"
   dependsOn: TerraformInit
   jobs:
     - job: PlanJob
+      displayName: "Terraform Plan"
       steps:
         - checkout: self
         - task: Bash@3
@@ -88,13 +91,14 @@ stages:
                 -var="vm_name=$(vm_name)" \
                 -var="ssh_public_key=$(ssh_public_key)"
 
-# ─────────── Stage 4: Terraform Apply ───────────
+# Stage 4: Terraform Apply
 - stage: TerraformApply
   displayName: "Terraform Apply"
   dependsOn: TerraformPlan
   condition: succeeded()
   jobs:
     - job: ApplyJob
+      displayName: "Terraform Apply"
       steps:
         - checkout: self
         - task: Bash@3
@@ -110,7 +114,7 @@ stages:
                 -var="ssh_public_key=$(ssh_public_key)" \
                 -auto-approve
 
-# ─────────── Stage 5: Configure NGINX via Ansible ───────────
+# Stage 5: Configure NGINX via Ansible
 - stage: ConfigureNginx
   displayName: "Configure NGINX via Ansible"
   dependsOn: TerraformApply
@@ -125,8 +129,8 @@ stages:
           inputs:
             targetType: 'inline'
             script: |
-              sudo apt-get update
-              sudo apt-get install -y ansible
+              sudo apt update
+              sudo apt install -y ansible
               ansible --version
         - task: Bash@3
           displayName: "Run NGINX Playbook"
