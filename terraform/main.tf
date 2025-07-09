@@ -1,13 +1,6 @@
 terraform {
   required_version = ">= 1.6.0"
 
-  backend "azurerm" {
-    resource_group_name  = "tfstate-rg"           # ✅ Must exist
-    storage_account_name = "gmadantfstate01"      # ✅ Must exist & be globally unique
-    container_name       = "tfstate"              # ✅ Blob container must exist
-    key                  = "terraform.tfstate"
-  }
-
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
@@ -20,13 +13,11 @@ provider "azurerm" {
   features {}
 }
 
-# ✅ Resource Group
 resource "azurerm_resource_group" "main" {
   name     = var.resource_group_name
   location = var.location
 }
 
-# ✅ Virtual Network
 resource "azurerm_virtual_network" "main" {
   name                = "demo-vnet"
   address_space       = ["10.0.0.0/16"]
@@ -34,7 +25,6 @@ resource "azurerm_virtual_network" "main" {
   resource_group_name = var.resource_group_name
 }
 
-# ✅ Subnet
 resource "azurerm_subnet" "main" {
   name                 = "demo-subnet"
   resource_group_name  = var.resource_group_name
@@ -42,7 +32,6 @@ resource "azurerm_subnet" "main" {
   address_prefixes     = ["10.0.1.0/24"]
 }
 
-# ✅ NSG with inbound SSH rule
 resource "azurerm_network_security_group" "main" {
   name                = "demo-nsg"
   location            = var.location
@@ -61,13 +50,11 @@ resource "azurerm_network_security_group" "main" {
   }
 }
 
-# ✅ Attach NSG to Subnet
 resource "azurerm_subnet_network_security_group_association" "main" {
   subnet_id                 = azurerm_subnet.main.id
   network_security_group_id = azurerm_network_security_group.main.id
 }
 
-# ✅ Public IP
 resource "azurerm_public_ip" "main" {
   name                = "demo-public-ip"
   location            = var.location
@@ -75,7 +62,6 @@ resource "azurerm_public_ip" "main" {
   allocation_method   = "Dynamic"
 }
 
-# ✅ NIC
 resource "azurerm_network_interface" "main" {
   name                = "demo-nic"
   location            = var.location
@@ -89,13 +75,13 @@ resource "azurerm_network_interface" "main" {
   }
 }
 
-# ✅ Linux Virtual Machine
 resource "azurerm_linux_virtual_machine" "main" {
-  name                  = var.vm_name
-  resource_group_name   = var.resource_group_name
-  location              = var.location
-  size                  = "Standard_B1s"
-  admin_username        = "azureuser"
+  name                = var.vm_name
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  size                = "Standard_B1s"
+  admin_username      = "azureuser"
+
   network_interface_ids = [azurerm_network_interface.main.id]
   disable_password_authentication = true
 
