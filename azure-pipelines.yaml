@@ -28,11 +28,11 @@ jobs:
       inputs:
         terraformVersion: "$(terraformVersion)"
 
-    # ✅ Export Service Principal credentials to env vars
+    # ✅ Export Service Principal ARM_* vars
     - task: AzureCLI@2
-      displayName: "Extract ARM_* env vars from Service Principal"
+      displayName: "Export ARM_* env vars from Service Principal"
       inputs:
-        azureSubscription: 'terraform-spn'   # ⚠️ Replace with your real service connection name
+        azureSubscription: 'terraform-spn'  # 🔁 Replace with your service connection name
         scriptType: bash
         scriptLocation: inlineScript
         inlineScript: |
@@ -59,7 +59,7 @@ jobs:
             -backend-config="container_name=tfstate" \
             -backend-config="key=terraform.tfstate"
 
-    # ✅ Terraform Plan
+    # ✅ Terraform Plan with SP credentials
     - task: Bash@3
       displayName: "Terraform Plan"
       env:
@@ -76,7 +76,11 @@ jobs:
             -var="resource_group_name=$(resource_group)" \
             -var="vm_name=$(vm_name)" \
             -var="ssh_public_key=$(ssh_public_key)" \
-            -var="my_ip_address=$(my_ip_address)"
+            -var="my_ip_address=$(my_ip_address)" \
+            -var="client_id=$(ARM_CLIENT_ID)" \
+            -var="client_secret=$(ARM_CLIENT_SECRET)" \
+            -var="subscription_id=$(ARM_SUBSCRIPTION_ID)" \
+            -var="tenant_id=$(ARM_TENANT_ID)"
 
     # ✅ Terraform Apply
     - task: Bash@3
@@ -95,9 +99,13 @@ jobs:
             -var="resource_group_name=$(resource_group)" \
             -var="vm_name=$(vm_name)" \
             -var="ssh_public_key=$(ssh_public_key)" \
-            -var="my_ip_address=$(my_ip_address)"
+            -var="my_ip_address=$(my_ip_address)" \
+            -var="client_id=$(ARM_CLIENT_ID)" \
+            -var="client_secret=$(ARM_CLIENT_SECRET)" \
+            -var="subscription_id=$(ARM_SUBSCRIPTION_ID)" \
+            -var="tenant_id=$(ARM_TENANT_ID)"
 
-    # ✅ Optional: Install & Run Ansible playbook
+    # ✅ Optional: Install & Run Ansible Playbook
     - task: Bash@3
       displayName: "Install & Run Ansible"
       inputs:
