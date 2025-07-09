@@ -32,7 +32,7 @@ variable "client_id" {
 }
 
 variable "client_secret" {
-  type = string
+  type      = string
   sensitive = true
 }
 
@@ -43,3 +43,4 @@ variable "subscription_id" {
 variable "tenant_id" {
   type = string
 }
+

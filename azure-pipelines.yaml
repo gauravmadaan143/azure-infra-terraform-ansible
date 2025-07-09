@@ -11,37 +11,27 @@ variables:
   terraform_folder: 'terraform'
   ansible_folder: 'ansible'
   location: 'westeurope'
-  resource_group: 'demo-rg'
+  resource_group_name: 'demo-rg'
   vm_name: 'demo-vm'
-  ssh_public_key: 'ssh-rsa AAAAB3...your_full_key_here...'
-  my_ip_address: '89.64.12.157/32'
+  ssh_public_key: 'ssh-rsa AAAAB3...your-public-key... user@host'
 
 jobs:
 - job: DeployInfra
   displayName: "Terraform + Ansible Deployment"
+  variables:
+    # These must be set in Azure DevOps pipeline library as secrets and linked or defined here
+    ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+    ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+    ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+    ARM_TENANT_ID: $(ARM_TENANT_ID)
   steps:
     - checkout: self
 
-    # ✅ Install Terraform
     - task: TerraformInstaller@1
       displayName: "Install Terraform"
       inputs:
         terraformVersion: "$(terraformVersion)"
 
-    # ✅ Export Service Principal credentials to env vars
-    - task: AzureCLI@2
-      displayName: "Extract ARM_* env vars from Service Principal"
-      inputs:
-        azureSubscription: 'terraform-spn'   # ⚠️ Replace with your real service connection name
-        scriptType: bash
-        scriptLocation: inlineScript
-        inlineScript: |
-          echo "##vso[task.setvariable variable=ARM_CLIENT_ID]$servicePrincipalId"
-          echo "##vso[task.setvariable variable=ARM_CLIENT_SECRET]$servicePrincipalKey"
-          echo "##vso[task.setvariable variable=ARM_SUBSCRIPTION_ID]$subscriptionId"
-          echo "##vso[task.setvariable variable=ARM_TENANT_ID]$tenantId"
-
-    # ✅ Terraform Init with backend config
     - task: Bash@3
       displayName: "Terraform Init"
       env:
@@ -53,13 +43,8 @@ jobs:
         targetType: inline
         script: |
           cd $(Build.SourcesDirectory)/$(terraform_folder)
-          terraform init \
-            -backend-config="resource_group_name=tfstate-rg" \
-            -backend-config="storage_account_name=gmadantfstate01" \
-            -backend-config="container_name=tfstate" \
-            -backend-config="key=terraform.tfstate"
+          terraform init
 
-    # ✅ Terraform Plan
     - task: Bash@3
       displayName: "Terraform Plan"
       env:
@@ -73,12 +58,14 @@ jobs:
           cd $(Build.SourcesDirectory)/$(terraform_folder)
           terraform plan \
             -var="location=$(location)" \
-            -var="resource_group_name=$(resource_group)" \
+            -var="resource_group_name=$(resource_group_name)" \
             -var="vm_name=$(vm_name)" \
             -var="ssh_public_key=$(ssh_public_key)" \
-            -var="my_ip_address=$(my_ip_address)"
+            -var="client_id=$(ARM_CLIENT_ID)" \
+            -var="client_secret=$(ARM_CLIENT_SECRET)" \
+            -var="subscription_id=$(ARM_SUBSCRIPTION_ID)" \
+            -var="tenant_id=$(ARM_TENANT_ID)"
 
-    # ✅ Terraform Apply
     - task: Bash@3
       displayName: "Terraform Apply"
       env:
@@ -92,12 +79,14 @@ jobs:
           cd $(Build.SourcesDirectory)/$(terraform_folder)
           terraform apply -auto-approve \
             -var="location=$(location)" \
-            -var="resource_group_name=$(resource_group)" \
+            -var="resource_group_name=$(resource_group_name)" \
             -var="vm_name=$(vm_name)" \
             -var="ssh_public_key=$(ssh_public_key)" \
-            -var="my_ip_address=$(my_ip_address)"
+            -var="client_id=$(ARM_CLIENT_ID)" \
+            -var="client_secret=$(ARM_CLIENT_SECRET)" \
+            -var="subscription_id=$(ARM_SUBSCRIPTION_ID)" \
+            -var="tenant_id=$(ARM_TENANT_ID)"
 
-    # ✅ Optional: Install & Run Ansible playbook
     - task: Bash@3
       displayName: "Install & Run Ansible"
       inputs:
@@ -107,3 +96,4 @@ jobs:
           sudo apt-get install -y ansible
           cd $(Build.SourcesDirectory)/$(ansible_folder)
           ansible-playbook -i inventory playbook.yaml
+
