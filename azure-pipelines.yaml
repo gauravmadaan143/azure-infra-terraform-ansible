@@ -8,7 +8,7 @@ pool:
 
 variables:
   terraformVersion: '1.6.6'
-  terraform_folder: 'terraform'   # adjust this after you see the debug output
+  terraform_folder: 'terraform'
   ansible_folder: 'ansible'
   location: 'westeurope'
   resource_group: 'demo-rg'
@@ -19,17 +19,15 @@ jobs:
 - job: TerraformAndAnsible
   displayName: Terraform + Ansible
   steps:
-
-    # 1. Checkout your repo
     - checkout: self
 
-    # 2. Debug: list all files and folders
+    # 1. Debug: list files in the sources directory
     - bash: |
-        echo "===== Workspace contents ====="
-        ls -R .
-      displayName: "List files for debugging"
+        echo "Sources directory contents:"
+        ls -R $(Build.SourcesDirectory)
+      displayName: "List $(Build.SourcesDirectory) for Debugging"
 
-    # 3. Install Terraform CLI locally
+    # 2. Install Terraform CLI locally
     - bash: |
         set -e
         echo "Downloading Terraform $(terraformVersion)..."
@@ -46,19 +44,19 @@ jobs:
         terraform -version
       displayName: "Install Terraform CLI"
 
-    # 4. Terraform Init
+    # 3. Terraform Init (using absolute path)
     - bash: |
         set -e
         echo "Running terraform init..."
-        cd $(terraform_folder)
+        cd $(Build.SourcesDirectory)/$(terraform_folder)
         terraform init
       displayName: "Terraform Init"
 
-    # 5. Terraform Plan
+    # 4. Terraform Plan
     - bash: |
         set -e
         echo "Running terraform plan..."
-        cd $(terraform_folder)
+        cd $(Build.SourcesDirectory)/$(terraform_folder)
         terraform plan \
           -var="location=$(location)" \
           -var="resource_group_name=$(resource_group)" \
@@ -66,11 +64,11 @@ jobs:
           -var="ssh_public_key=$(ssh_public_key)"
       displayName: "Terraform Plan"
 
-    # 6. Terraform Apply
+    # 5. Terraform Apply
     - bash: |
         set -e
         echo "Running terraform apply..."
-        cd $(terraform_folder)
+        cd $(Build.SourcesDirectory)/$(terraform_folder)
         terraform apply -auto-approve \
           -var="location=$(location)" \
           -var="resource_group_name=$(resource_group)" \
@@ -78,13 +76,13 @@ jobs:
           -var="ssh_public_key=$(ssh_public_key)"
       displayName: "Terraform Apply"
 
-    # 7. Install & Run Ansible Playbook
+    # 6. Install & Run Ansible Playbook
     - bash: |
         set -e
         echo "Installing Ansible..."
         sudo apt-get update
         sudo apt-get install -y ansible
         echo "Running Ansible playbook..."
-        cd $(ansible_folder)
-        ansible-playbook -i inventory site.yml
+        cd $(Build.SourcesDirectory)/$(ansible_folder)
+        ansible-playbook -i inventory playbook.yaml
       displayName: "Configure NGINX via Ansible"
