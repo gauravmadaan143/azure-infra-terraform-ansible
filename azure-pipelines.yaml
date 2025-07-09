@@ -13,7 +13,11 @@ variables:
   location: 'westeurope'
   resource_group: 'demo-rg'
   vm_name: 'demo-vm'
+<<<<<<< HEAD
   ssh_public_key: 'ssh-rsa AAAAB3Nza...your_key... gauravmadaan143@gmail.com'
+=======
+  ssh_public_key: 'ssh-rsa AAAAB3...REDACTED...ho6Q== gauravmadaan143@gmail.com'
+>>>>>>> f8e72e61920a16bef7dfff781c352c6b9d4f6a02
   my_ip_address: '89.64.12.157/32'
 
 jobs:
@@ -22,12 +26,17 @@ jobs:
   steps:
     - checkout: self
 
+<<<<<<< HEAD
     # ✅ Install Terraform CLI
+=======
+    # ✅ Install Terraform
+>>>>>>> f8e72e61920a16bef7dfff781c352c6b9d4f6a02
     - task: TerraformInstaller@1
       displayName: "Install Terraform"
       inputs:
         terraformVersion: "$(terraformVersion)"
 
+<<<<<<< HEAD
     # ✅ Export Service Principal credentials to pipeline variables
     - task: AzureCLI@2
       displayName: "Set ARM_* env vars from Service Connection"
@@ -43,6 +52,10 @@ jobs:
 
     # ✅ Terraform Init using Bash and SP creds
     - task: Bash@3
+=======
+    # ✅ Terraform Init (inside Azure context)
+    - task: AzureCLI@2
+>>>>>>> f8e72e61920a16bef7dfff781c352c6b9d4f6a02
       displayName: "Terraform Init"
       env:
         ARM_CLIENT_ID: $(ARM_CLIENT_ID)
@@ -50,13 +63,15 @@ jobs:
         ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
         ARM_TENANT_ID: $(ARM_TENANT_ID)
       inputs:
-        targetType: inline
-        script: |
-          cd $(Build.SourcesDirectory)/$(terraform_folder)
+        azureSubscription: 'terraform-spn'  # 🔁 Replace with your real service connection name
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        workingDirectory: $(Build.SourcesDirectory)/$(terraform_folder)
+        inlineScript: |
           terraform init
 
-    # ✅ Terraform Plan
-    - task: Bash@3
+    # ✅ Terraform Plan (Azure context)
+    - task: AzureCLI@2
       displayName: "Terraform Plan"
       env:
         ARM_CLIENT_ID: $(ARM_CLIENT_ID)
@@ -64,9 +79,11 @@ jobs:
         ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
         ARM_TENANT_ID: $(ARM_TENANT_ID)
       inputs:
-        targetType: inline
-        script: |
-          cd $(Build.SourcesDirectory)/$(terraform_folder)
+        azureSubscription: 'terraform-spn'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        workingDirectory: $(Build.SourcesDirectory)/$(terraform_folder)
+        inlineScript: |
           terraform plan \
             -var="location=$(location)" \
             -var="resource_group_name=$(resource_group)" \
@@ -74,8 +91,8 @@ jobs:
             -var="ssh_public_key=$(ssh_public_key)" \
             -var="my_ip_address=$(my_ip_address)"
 
-    # ✅ Terraform Apply
-    - task: Bash@3
+    # ✅ Terraform Apply (Azure context)
+    - task: AzureCLI@2
       displayName: "Terraform Apply"
       env:
         ARM_CLIENT_ID: $(ARM_CLIENT_ID)
@@ -83,9 +100,11 @@ jobs:
         ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
         ARM_TENANT_ID: $(ARM_TENANT_ID)
       inputs:
-        targetType: inline
-        script: |
-          cd $(Build.SourcesDirectory)/$(terraform_folder)
+        azureSubscription: 'terraform-spn'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        workingDirectory: $(Build.SourcesDirectory)/$(terraform_folder)
+        inlineScript: |
           terraform apply -auto-approve \
             -var="location=$(location)" \
             -var="resource_group_name=$(resource_group)" \
@@ -93,7 +112,11 @@ jobs:
             -var="ssh_public_key=$(ssh_public_key)" \
             -var="my_ip_address=$(my_ip_address)"
 
+<<<<<<< HEAD
     # ✅ Ansible Stage (optional)
+=======
+    # ✅ Install and Run Ansible
+>>>>>>> f8e72e61920a16bef7dfff781c352c6b9d4f6a02
     - task: Bash@3
       displayName: "Install & Run Ansible"
       inputs:
