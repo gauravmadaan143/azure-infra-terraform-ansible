@@ -13,7 +13,7 @@ variables:
   location: 'westeurope'
   resource_group: 'demo-rg'
   vm_name: 'demo-vm'
-  ssh_public_key: 'ssh-rsa AAAAB3Nza...your_key... gauravmadaan143@gmail.com'
+  ssh_public_key: 'ssh-rsa AAAAB3Nza...YOUR_KEY...== gauravmadaan143@gmail.com'
   my_ip_address: '89.64.12.157/32'
 
 jobs:
@@ -28,11 +28,11 @@ jobs:
       inputs:
         terraformVersion: "$(terraformVersion)"
 
-    # ✅ Export Service Principal credentials to pipeline variables
+    # ✅ Export ARM_* variables from Azure Service Connection
     - task: AzureCLI@2
-      displayName: "Set ARM_* env vars from Service Connection"
+      displayName: "Extract ARM credentials"
       inputs:
-        azureSubscription: 'terraform-spn'  # ⬅️ Replace with your actual service connection name
+        azureSubscription: 'terraform-spn'  # 🔁 Replace with your actual service connection name
         scriptType: bash
         scriptLocation: inlineScript
         inlineScript: |
@@ -41,7 +41,7 @@ jobs:
           echo "##vso[task.setvariable variable=ARM_SUBSCRIPTION_ID]$subscriptionId"
           echo "##vso[task.setvariable variable=ARM_TENANT_ID]$tenantId"
 
-    # ✅ Terraform Init using Bash and SP creds
+    # ✅ Terraform Init
     - task: Bash@3
       displayName: "Terraform Init"
       env:
@@ -93,7 +93,7 @@ jobs:
             -var="ssh_public_key=$(ssh_public_key)" \
             -var="my_ip_address=$(my_ip_address)"
 
-    # ✅ Ansible Stage (optional)
+    # ✅ Ansible Install & Run
     - task: Bash@3
       displayName: "Install & Run Ansible"
       inputs:
