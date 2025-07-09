@@ -8,31 +8,39 @@ pool:
 
 variables:
   terraform_version: '1.6.6'
+  resource_group: 'demo-rg'
+  vm_name: 'demo-vm'
+  location: 'westeurope'
   terraform_folder: 'terraform'
   ansible_folder: 'ansible'
+  ssh_public_key: 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDSgIiTUaJttDCYf0wLHqiSnq00iwH5RFFa8ukJiug+qdK0kgjKgtoABgJxF3nyXKoaFEuEq1+90ZtqEt7oQGMSaFGryhggGrNOdPSq3ZuLqlpBiiiH1aSQHxmPkOjLUR4y2jIh6pXL4VvEHRvXrf6woFeU+17wWalo+22RUs1iTvvJvBac9UytDnv6vIjujr4ALGqL9eBnss6Kk/dOifWx0lutFMJxTDYXOPtUOKuSBn3ZX+HGNtLHb2KViL29jbpqwu0kF23KBpUeds8YIYvKJkRci8S8s2U+WQliDqYzRGC87qCEYh43nS+5owGIeYTl3xt2tZFR0EjPdTm7s2Me+z6Pr7JYd17Q9E+m4cC0a+MQK3W/cOVl4/zD+2K5y1bfMovQ2OK2Bz/lyvsE29jtauL9ULa8KZ/81szYc9vV6dPD6602gdZ0Q5WwCE7jvzzC0ZfJeZ//Jtt4jlGc8Gg2av9QITvEMxmGEQDltPB4E9SIrodyrIV/CarXPteYQWyAAg+I1Nf+nX7esalLVAmincxnCW3YstZaO50N1djMd65ulaIJIrjoTbPVia9YKixeQAKb9RyFhkp6OjNNrNOD9GSyBNrT2bfBrqQ4LrRiPedRHEttX64lBJesxNImeCbpl96cqnAR+mHYG+78I4EzLL/6JTVI/M6dG3gvijho6Q== gauravmadaan143@gmail.com'
 
 stages:
-
-# ───────────── Stage 1: Install Terraform ─────────────
+# ─────────────── Install Terraform CLI ───────────────
 - stage: InstallTerraform
+  displayName: "Install Terraform CLI"
   jobs:
     - job: InstallTerraformJob
-      displayName: "Install Terraform CLI"
       steps:
+        - checkout: self
         - script: |
-            echo "Downloading Terraform..."
+            echo "Cleaning old terraform binary if exists..."
+            sudo rm -f /usr/local/bin/terraform || true
+            echo "Downloading Terraform version $(terraform_version)..."
             curl -sLo terraform.zip https://releases.hashicorp.com/terraform/$(terraform_version)/terraform_$(terraform_version)_linux_amd64.zip
+            echo "Unzipping Terraform..."
             unzip -o terraform.zip
             sudo mv terraform /usr/local/bin/
+            rm terraform.zip
             terraform -version
           displayName: "Install Terraform CLI"
 
-# ───────────── Stage 2: Terraform Init ─────────────
-- stage: TerraformInit
+# ─────────────── Terraform Init ───────────────
+- stage: Init
+  displayName: "Terraform Init"
   dependsOn: InstallTerraform
   jobs:
     - job: InitJob
-      displayName: "Terraform Init"
       steps:
         - checkout: self
         - script: |
@@ -40,61 +48,57 @@ stages:
             terraform init
           displayName: "Terraform Init"
 
-# ───────────── Stage 3: Terraform Plan ─────────────
-- stage: TerraformPlan
-  dependsOn: TerraformInit
+# ─────────────── Terraform Plan ───────────────
+- stage: Plan
+  displayName: "Terraform Plan"
+  dependsOn: Init
   jobs:
     - job: PlanJob
-      displayName: "Terraform Plan"
       steps:
         - checkout: self
         - script: |
             cd $(terraform_folder)
             terraform plan \
               -var="location=$(location)" \
-              -var="resource_group_name=$(resource_group_name)" \
+              -var="resource_group_name=$(resource_group)" \
               -var="vm_name=$(vm_name)" \
-              -var="ssh_public_key=$(ssh_public_key)" \
-              -var="my_ip_address=$(my_ip_address)"
+              -var="ssh_public_key=$(ssh_public_key)"
           displayName: "Terraform Plan"
 
-# ───────────── Stage 4: Terraform Apply ─────────────
-- stage: TerraformApply
-  dependsOn: TerraformPlan
+# ─────────────── Terraform Apply ───────────────
+- stage: Apply
+  displayName: "Terraform Apply"
+  dependsOn: Plan
   condition: succeeded()
   jobs:
     - job: ApplyJob
-      displayName: "Terraform Apply"
       steps:
         - checkout: self
         - script: |
             cd $(terraform_folder)
             terraform apply \
               -var="location=$(location)" \
-              -var="resource_group_name=$(resource_group_name)" \
+              -var="resource_group_name=$(resource_group)" \
               -var="vm_name=$(vm_name)" \
               -var="ssh_public_key=$(ssh_public_key)" \
-              -var="my_ip_address=$(my_ip_address)" \
               -auto-approve
           displayName: "Terraform Apply"
 
-# ───────────── Stage 5: Ansible Configure NGINX ─────────────
-- stage: AnsibleConfigure
-  dependsOn: TerraformApply
+# ─────────────── Ansible Stage ───────────────
+- stage: ConfigureNginx
+  displayName: "Configure NGINX via Ansible"
+  dependsOn: Apply
   condition: succeeded()
   jobs:
     - job: AnsibleJob
-      displayName: "Configure NGINX using Ansible"
       steps:
         - checkout: self
-
         - script: |
-            sudo apt update
-            sudo apt install -y ansible
+            sudo apt-get update -y
+            sudo apt-get install -y ansible
             ansible --version
           displayName: "Install Ansible"
-
         - script: |
             cd $(ansible_folder)
             ansible-playbook -i inventory site.yml
-          displayName: "Run NGINX Ansible Playbook"
+          displayName: "Run NGINX Playbook"
