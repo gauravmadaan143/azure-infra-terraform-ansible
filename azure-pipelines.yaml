@@ -21,7 +21,7 @@ variables:
 - name: vm_name
   value: 'demo-vm'
 - name: ssh_public_key
-  value: $(SSH_PUBLIC_KEY)
+  value: '$(SSH_PUBLIC_KEY)'
 - name: my_ip_address
   value: '89.64.12.157'
 
