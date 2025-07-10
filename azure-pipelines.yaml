@@ -91,43 +91,52 @@ jobs:
             -var="subscription_id=$(ARM_SUBSCRIPTION_ID)" \
             -var="tenant_id=$(ARM_TENANT_ID)"
 
-    - task: Bash@3
-      displayName: 'Write SSH Private Key to File'
-      inputs:
-        targetType: 'inline'
-        script: |
-          mkdir -p ~/.ssh
-          echo '$(SSH_PRIVATE_KEY)' > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          
-# Append VM public IP to Ansible inventory file dynamically
-    - task: Bash@3
-      displayName: 'Append VM IP to Ansible Inventory'
-      inputs:
-        targetType: 'inline'
-        script: |
-          cd $(Build.SourcesDirectory)/$(terraform_folder)
-          VM_PUBLIC_IP=$(terraform output -raw vm_public_ip)
-          echo "✅ VM_PUBLIC_IP is $VM_PUBLIC_IP"
+          - task: Bash@3
+            displayName: 'Write SSH Private Key to File'
+            inputs:
+              targetType: 'inline'
+              script: |
+                mkdir -p ~/.ssh
+                echo '$(SSH_PRIVATE_KEY)' > ~/.ssh/id_rsa
+                chmod 600 ~/.ssh/id_rsa
+                - task: Bash@3
+            displayName: 'Get VM public IP and prepare Ansible inventory'
+            inputs:
+              targetType: 'inline'
+              script: |
+                cd $(Build.SourcesDirectory)/$(terraform_folder)
+                VM_PUBLIC_IP=$(terraform output -raw vm_public_ip)
 
-          mkdir -p $(Build.SourcesDirectory)/$(ansible_folder)
-          INVENTORY_FILE="$(Build.SourcesDirectory)/$(ansible_folder)/inventory"
+                if [ -z "$VM_PUBLIC_IP" ]; then
+                  echo "❌ ERROR: VM public IP is empty."
+                  exit 1
+                fi
 
-          echo "[linux_servers]" > $INVENTORY_FILE
-          echo "demo-vm ansible_host=$VM_PUBLIC_IP ansible_user=azureuser ansible_ssh_private_key_file=~/.ssh/id_rsa" >> $INVENTORY_FILE
+                echo "✅ VM Public IP is $VM_PUBLIC_IP"
 
-          echo "📋 Inventory content:"
-          cat $INVENTORY_FILE
+                mkdir -p $(Build.SourcesDirectory)/$(ansible_folder)
 
-    # Run Ansible playbook inside official Ansible Docker container
-    - task: Bash@3
-      displayName: 'Run Ansible Playbook in Docker'
-      inputs:
-        targetType: 'inline'
-        script: |
-          docker run --rm \
-            -v $(Build.SourcesDirectory)/$(ansible_folder):/ansible:ro \
-            -v ~/.ssh:/root/.ssh:ro \
-            -e ANSIBLE_HOST_KEY_CHECKING=False \
-            williamyeh/ansible:alpine3 \
-            ansible-playbook -i /ansible/inventory /ansible/playbook.yml
+                INVENTORY_FILE="$(Build.SourcesDirectory)/$(ansible_folder)/inventory"
+
+                echo "[linux_servers]" > $INVENTORY_FILE
+                echo "demo-vm ansible_host=$VM_PUBLIC_IP ansible_user=azureuser ansible_ssh_private_key_file=~/.ssh/id_rsa" >> $INVENTORY_FILE
+
+                echo "📋 Inventory content:"
+                cat $INVENTORY_FILE
+
+          - task: Bash@3
+            displayName: 'Install Ansible on agent'
+            inputs:
+              targetType: 'inline'
+              script: |
+                sudo apt-get update
+                sudo apt-get install -y ansible
+                ansible --version
+
+          - task: Bash@3
+            displayName: 'Run Ansible Playbook'
+            inputs:
+              targetType: 'inline'
+              script: |
+                cd $(Build.SourcesDirectory)/$(ansible_folder)
+                ansible-playbook -i inventory playbook.yml
