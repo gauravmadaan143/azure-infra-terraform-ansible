@@ -114,6 +114,15 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           echo "✅ SSH private key saved"
 
+    - task: Bash@3
+      displayName: 'Verify Terraform output'
+      inputs:
+        targetType: 'inline'
+        script: |
+          cd $(Build.SourcesDirectory)/$(terraform_folder)
+          terraform output vm_public_ip || echo "No vm_public_ip output found"
+      
+
     # ✅ Append dynamic VM public IP to existing inventory file
     - task: Bash@3
       displayName: 'Append VM IP to Ansible inventory file'
@@ -158,8 +167,12 @@ jobs:
         targetType: inline
         script: |
           echo "📦 Installing Ansible (RHEL 8)..."
-          sudo dnf install -y epel-release
-          sudo dnf install -y ansible
+          sudo apt-get update
+          sudo apt-get install -y ansible
+         
+          echo "===== Inventory file contents ====="
+          cat ansible/inventory
+          echo "=================================="
 
           echo "🚀 Running Ansible Playbook..."
           cd ansible
