@@ -20,8 +20,6 @@ variables:
   value: 'demo-rg'
 - name: vm_name
   value: 'demo-vm'
-- name: ssh_public_key
-  value: 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDSgIiTUaJttDCYf0wLHqiSnq00iwH5RFFa8ukJiug+qdK0kgjKgtoABgJxF3nyXKoaFEuEq1+90ZtqEt7oQGMSaFGryhggGrNOdPSq3ZuLqlpBiiiH1aSQHxmPkOjLUR4y2jIh6pXL4VvEHRvXrf6woFeU+17wWalo+22RUs1iTvvJvBac9UytDnv6vIjujr4ALGqL9eBnss6Kk/dOifWx0lutFMJxTDYXOPtUOKuSBn3ZX+HGNtLHb2KViL29jbpqwu0kF23KBpUeds8YIYvKJkRci8S8s2U+WQliDqYzRGC87qCEYh43nS+5owGIeYTl3xt2tZFR0EjPdTm7s2Me+z6Pr7JYd17Q9E+m4cC0a+MQK3W/cOVl4/zD+2K5y1bfMovQ2OK2Bz/lyvsE29jtauL9ULa8KZ/81szYc9vV6dPD6602gdZ0Q5WwCE7jvzzC0ZfJeZ//Jtt4jlGc8Gg2av9QITvEMxmGEQDltPB4E9SIrodyrIV/CarXPteYQWyAAg+I1Nf+nX7esalLVAmincxnCW3YstZaO50N1djMd65ulaIJIrjoTbPVia9YKixeQAKb9RyFhkp6OjNNrNOD9GSyBNrT2bfBrqQ4LrRiPedRHEttX64lBJesxNImeCbpl96cqnAR+mHYG+78I4EzLL/6JTVI/M6dG3gvijho6Q== gauravmadaan143@gmail.com'
 - name: my_ip_address
   value: '89.64.12.157'
 
@@ -94,25 +92,27 @@ jobs:
             -var="tenant_id=$(ARM_TENANT_ID)"
 
     - task: Bash@3
-      displayName: 'Write SSH Private Key to File'
-      inputs:
-        targetType: 'inline'
-        script: |
-          mkdir -p ~/.ssh
-          echo '$(SSH_PRIVATE_KEY)' > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          
-# Append VM public IP to Ansible inventory file dynamically
-    - task: Bash@3
-      displayName: 'Append VM IP to Ansible Inventory'
+      displayName: 'Get VM public IP and prepare Ansible inventory'
+      env:
+        ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+        ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+        ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+        ARM_TENANT_ID: $(ARM_TENANT_ID)
       inputs:
         targetType: 'inline'
         script: |
           cd $(Build.SourcesDirectory)/$(terraform_folder)
           VM_PUBLIC_IP=$(terraform output -raw vm_public_ip)
-          echo "✅ VM_PUBLIC_IP is $VM_PUBLIC_IP"
+
+          if [ -z "$VM_PUBLIC_IP" ]; then
+            echo "❌ ERROR: VM public IP is empty."
+            exit 1
+          fi
+
+          echo "✅ VM Public IP is $VM_PUBLIC_IP"
 
           mkdir -p $(Build.SourcesDirectory)/$(ansible_folder)
+
           INVENTORY_FILE="$(Build.SourcesDirectory)/$(ansible_folder)/inventory"
 
           echo "[linux_servers]" > $INVENTORY_FILE
@@ -121,15 +121,21 @@ jobs:
           echo "📋 Inventory content:"
           cat $INVENTORY_FILE
 
-    # Run Ansible playbook inside official Ansible Docker container
+  
     - task: Bash@3
-      displayName: 'Run Ansible Playbook in Docker'
+      displayName: 'Install Ansible on agent'
       inputs:
         targetType: 'inline'
         script: |
-          docker run --rm \
-            -v $(Build.SourcesDirectory)/$(ansible_folder):/ansible:ro \
-            -v ~/.ssh:/root/.ssh:ro \
-            -e ANSIBLE_HOST_KEY_CHECKING=False \
-            williamyeh/ansible:alpine3 \
-            ansible-playbook -i /ansible/inventory /ansible/playbook.yml
+          sudo apt-get update
+          sudo apt-get install -y ansible
+          ansible --version
+
+  
+    - task: Bash@3
+      displayName: 'Run Ansible Playbook'
+      inputs:
+        targetType: 'inline'
+        script: |
+          cd $(Build.SourcesDirectory)/$(ansible_folder)
+          ansible-playbook -i inventory playbook.yml
