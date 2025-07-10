@@ -123,56 +123,59 @@ jobs:
           terraform output vm_public_ip || echo "No vm_public_ip output found"
       
 
-        # ✅ Append dynamic VM public IP to existing inventory file
+    - task: Bash@3
+      displayName: 'Install Ansible'
+      inputs:
+          targetType: 'inline'
+          script: |
+            echo "Installing Ansible..."
+            sudo apt-get update
+            sudo apt-get install -y ansible
+            ansible --version
+
+  # Append VM IP to Ansible inventory file
     - task: Bash@3
       displayName: 'Append VM IP to Ansible inventory file'
       inputs:
-        targetType: 'inline'
-        script: |
-          cd $(terraform_folder)
-          VM_PUBLIC_IP=$(terraform output -raw vm_public_ip)
+          targetType: 'inline'
+          script: |
+            cd $(terraform_folder)
+            VM_PUBLIC_IP=$(terraform output -raw vm_public_ip)
 
-          if [ -z "$VM_PUBLIC_IP" ]; then
-            echo "❌ ERROR: Terraform output 'vm_public_ip' is empty. Please verify your Terraform state and output."
-            exit 1
-          fi
+            if [ -z "$VM_PUBLIC_IP" ]; then
+              echo "❌ ERROR: Terraform output 'vm_public_ip' is empty. Please verify your Terraform state and output."
+              exit 1
+            fi
 
-          echo "✅ VM_PUBLIC_IP is $VM_PUBLIC_IP"
+            echo "✅ VM_PUBLIC_IP is $VM_PUBLIC_IP"
 
-          mkdir -p ansible
+            mkdir -p ansible
 
-          # Create inventory if missing
-          if [ ! -f ansible/inventory ]; then
-            echo "[linux_servers]" > ansible/inventory
-          fi
+            if [ ! -f ansible/inventory ]; then
+              echo "[linux_servers]" > ansible/inventory
+            fi
 
-          # Ensure group header exists
-          if ! grep -q "^\[linux_servers\]" ansible/inventory; then
-            echo "[linux_servers]" >> ansible/inventory
-          fi
+            if ! grep -q "^\[linux_servers\]" ansible/inventory; then
+              echo "[linux_servers]" >> ansible/inventory
+            fi
 
-          # Avoid duplicate entries
-          if ! grep -q "$VM_PUBLIC_IP" ansible/inventory; then
-            echo "demo-vm ansible_host=$VM_PUBLIC_IP ansible_user=azureuser ansible_ssh_private_key_file=~/.ssh/id_rsa" >> ansible/inventory
-          fi
+            if ! grep -q "$VM_PUBLIC_IP" ansible/inventory; then
+              echo "demo-vm ansible_host=$VM_PUBLIC_IP ansible_user=azureuser ansible_ssh_private_key_file=~/.ssh/id_rsa" >> ansible/inventory
+            fi
 
-          echo "📋 Final Inventory Content:"
-          cat ansible/inventory
+            echo "📋 Final Inventory Content:"
+            cat ansible/inventory
 
-    # ✅ Install Ansible on RHEL & Run the Playbook
+  # Run Ansible playbook
     - task: Bash@3
-      displayName: "Install & Run Ansible"
+      displayName: 'Run Ansible Playbook'
       inputs:
-        targetType: inline
-        script: |
-          echo "📦 Installing Ansible (RHEL 8)..."
-          sudo apt-get update
-          sudo apt-get install -y ansible
-        
-          echo "===== Inventory file contents ====="
-          cat ansible/inventory
-          echo "=================================="
+          targetType: 'inline'
+          script: |
+            cd $(terraform_folder)
+            echo "===== Inventory file contents ====="
+            cat ansible/inventory || echo "⚠️ Inventory file not found!"
+            echo "=================================="
 
-          echo "🚀 Running Ansible Playbook..."
-          cd ansible
-          ansible-playbook -i inventory playbook.yaml
+            echo "🚀 Running Ansible Playbook..."
+            ansible-playbook -i ansible/inventory ../ansible/playbook.yml
