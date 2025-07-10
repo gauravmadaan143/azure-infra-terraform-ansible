@@ -101,15 +101,17 @@ jobs:
           mkdir -p ~/.ssh
           echo '$(SSH_PRIVATE_KEY)' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-
+          
+# Append VM public IP to Ansible inventory file dynamically
     - task: Bash@3
       displayName: 'Append VM IP to Ansible Inventory'
       inputs:
         targetType: 'inline'
         script: |
-          cd $(terraform_folder)
+          cd $(Build.SourcesDirectory)/$(terraform_folder)
           VM_PUBLIC_IP=$(terraform output -raw vm_public_ip)
           echo "✅ VM_PUBLIC_IP is $VM_PUBLIC_IP"
+
           mkdir -p $(Build.SourcesDirectory)/$(ansible_folder)
           INVENTORY_FILE="$(Build.SourcesDirectory)/$(ansible_folder)/inventory"
 
@@ -119,10 +121,15 @@ jobs:
           echo "📋 Inventory content:"
           cat $INVENTORY_FILE
 
+    # Run Ansible playbook inside official Ansible Docker container
     - task: Bash@3
       displayName: 'Run Ansible Playbook in Docker'
       inputs:
         targetType: 'inline'
         script: |
-          docker run --rm -v $(Build.SourcesDirectory)/$(ansible_folder):/ansible -v ~/.ssh:/root/.ssh:ro -w /ansible ghcr.io/ansible/ansible-runner:latest \
-            ansible-playbook -i inventory playbook.yml
+          docker run --rm \
+            -v $(Build.SourcesDirectory)/$(ansible_folder):/ansible:ro \
+            -v ~/.ssh:/root/.ssh:ro \
+            -e ANSIBLE_HOST_KEY_CHECKING=False \
+            williamyeh/ansible:alpine3 \
+            ansible-playbook -i /ansible/inventory /ansible/playbook.yml
