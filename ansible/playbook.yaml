@@ -1,22 +1,49 @@
 ---
-- name: Configure Linux VM
-  hosts: azure_vms
+- name: Configure RHEL Azure VM and Install NGINX
+  hosts: linux_servers
   become: true
+
   tasks:
-    - name: Ensure NGINX is installed
-      apt:
+    - name: Install required base packages
+      yum:
+        name: ['git', 'curl', 'wget']
+        state: present
+
+    - name: Enable and start firewalld
+      service:
+        name: firewalld
+        state: started
+        enabled: yes
+
+    - name: Allow HTTP service through firewalld
+      firewalld:
+        service: http
+        permanent: true
+        state: enabled
+        immediate: yes
+
+    - name: Ensure EPEL repository is available
+      yum:
+        name: epel-release
+        state: present
+
+    - name: Install NGINX
+      yum:
         name: nginx
         state: present
-        update_cache: yes
 
-    - name: Start and enable NGINX
-      systemd:
+    - name: Enable and start NGINX service
+      service:
         name: nginx
         state: started
-        enabled: true
+        enabled: yes
 
-    - name: Create a welcome index.html
-      copy:
-        dest: /var/www/html/index.html
-        content: "<h1>Hello from Ansible on Azure VM</h1>"
+    - name: Display NGINX status
+      command: systemctl status nginx
+      register: nginx_status
+      ignore_errors: true
+
+    - name: Show NGINX status output
+      debug:
+        var: nginx_status.stdout_lines
 
