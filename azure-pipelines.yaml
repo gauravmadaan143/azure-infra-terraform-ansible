@@ -119,7 +119,8 @@ jobs:
           echo "📋 Inventory content:"
           cat $INVENTORY_FILE
 
-            - task: Bash@3
+
+          - task: Bash@3
           displayName: "Run Ansible Playbook in Docker"
           inputs:
             targetType: 'inline'
