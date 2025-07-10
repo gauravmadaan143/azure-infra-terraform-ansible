@@ -46,7 +46,7 @@ jobs:
       inputs:
         targetType: inline
         script: |
-          cd $(Build.SourcesDirectory)/$(terraform_folder)
+          cd $(terraform_folder)
           terraform init
 
     - task: Bash@3
@@ -56,13 +56,10 @@ jobs:
         ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
         ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
         ARM_TENANT_ID: $(ARM_TENANT_ID)
-        ssh_public_key: $(ssh_public_key) 
       inputs:
         targetType: inline
         script: |
-          echo "SSH Public Key starts with: $(echo $ssh_public_key | cut -c1-40)..."
-          displayName: "Debug SSH public key variable"
-          cd $(Build.SourcesDirectory)/$(terraform_folder)
+          cd $(terraform_folder)
           terraform plan \
             -var="location=$(location)" \
             -var="resource_group_name=$(resource_group_name)" \
@@ -81,13 +78,10 @@ jobs:
         ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
         ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
         ARM_TENANT_ID: $(ARM_TENANT_ID)
-        ssh_public_key: $(ssh_public_key) 
       inputs:
         targetType: inline
         script: |
-          echo "SSH Public Key starts with: $(echo $ssh_public_key | cut -c1-40)..."
-          displayName: "Debug SSH public key variable"
-          cd $(Build.SourcesDirectory)/$(terraform_folder)
+          cd $(terraform_folder)
           terraform apply -auto-approve \
             -var="location=$(location)" \
             -var="resource_group_name=$(resource_group_name)" \
@@ -98,81 +92,37 @@ jobs:
             -var="client_secret=$(ARM_CLIENT_SECRET)" \
             -var="subscription_id=$(ARM_SUBSCRIPTION_ID)" \
             -var="tenant_id=$(ARM_TENANT_ID)"
-          
-          echo "Fetching VM public IP output..."
-          terraform output -raw vm_public_ip
 
-
-    # ✅ Write SSH Private Key to ~/.ssh/id_rsa
     - task: Bash@3
-      displayName: 'Write SSH private key to file'
+      displayName: 'Write SSH Private Key to File'
       inputs:
         targetType: 'inline'
         script: |
           mkdir -p ~/.ssh
           echo '$(SSH_PRIVATE_KEY)' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          echo "✅ SSH private key saved"
 
     - task: Bash@3
-      displayName: 'Verify Terraform output'
-      inputs:
-        targetType: 'inline'
-        script: |
-          cd $(Build.SourcesDirectory)/$(terraform_folder)
-          terraform output vm_public_ip || echo "No vm_public_ip output found"
-      
-
-        # ✅ Append dynamic VM public IP to existing inventory file
-    - task: Bash@3
-      displayName: 'Append VM IP to Ansible inventory file'
+      displayName: 'Append VM IP to Ansible Inventory'
       inputs:
         targetType: 'inline'
         script: |
           cd $(terraform_folder)
           VM_PUBLIC_IP=$(terraform output -raw vm_public_ip)
-
-          if [ -z "$VM_PUBLIC_IP" ]; then
-            echo "❌ ERROR: Terraform output 'vm_public_ip' is empty. Please verify your Terraform state and output."
-            exit 1
-          fi
-
           echo "✅ VM_PUBLIC_IP is $VM_PUBLIC_IP"
+          mkdir -p $(Build.SourcesDirectory)/$(ansible_folder)
+          INVENTORY_FILE="$(Build.SourcesDirectory)/$(ansible_folder)/inventory"
 
-          mkdir -p ansible
+          echo "[linux_servers]" > $INVENTORY_FILE
+          echo "demo-vm ansible_host=$VM_PUBLIC_IP ansible_user=azureuser ansible_ssh_private_key_file=~/.ssh/id_rsa" >> $INVENTORY_FILE
 
-          # Create inventory if missing
-          if [ ! -f ansible/inventory ]; then
-            echo "[linux_servers]" > ansible/inventory
-          fi
+          echo "📋 Inventory content:"
+          cat $INVENTORY_FILE
 
-          # Ensure group header exists
-          if ! grep -q "^\[linux_servers\]" ansible/inventory; then
-            echo "[linux_servers]" >> ansible/inventory
-          fi
-
-          # Avoid duplicate entries
-          if ! grep -q "$VM_PUBLIC_IP" ansible/inventory; then
-            echo "demo-vm ansible_host=$VM_PUBLIC_IP ansible_user=azureuser ansible_ssh_private_key_file=~/.ssh/id_rsa" >> ansible/inventory
-          fi
-
-          echo "📋 Final Inventory Content:"
-          cat ansible/inventory
-
-    # ✅ Install Ansible on RHEL & Run the Playbook
     - task: Bash@3
-      displayName: "Install & Run Ansible"
+      displayName: 'Run Ansible Playbook in Docker'
       inputs:
-        targetType: inline
+        targetType: 'inline'
         script: |
-          echo "📦 Installing Ansible (RHEL 8)..."
-          sudo apt-get update
-          sudo apt-get install -y ansible
-        
-          echo "===== Inventory file contents ====="
-          cat ansible/inventory
-          echo "=================================="
-
-          echo "🚀 Running Ansible Playbook..."
-          cd ansible
-          ansible-playbook -i inventory playbook.yaml
+          docker run --rm -v $(Build.SourcesDirectory)/$(ansible_folder):/ansible -v ~/.ssh:/root/.ssh:ro -w /ansible ghcr.io/ansible/ansible-runner:latest \
+            ansible-playbook -i inventory playbook.yml
