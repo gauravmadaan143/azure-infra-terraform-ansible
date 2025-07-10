@@ -123,12 +123,13 @@ jobs:
           terraform output vm_public_ip || echo "No vm_public_ip output found"
       
 
-    # ✅ Append dynamic VM public IP to existing inventory file
+        # ✅ Append dynamic VM public IP to existing inventory file
     - task: Bash@3
       displayName: 'Append VM IP to Ansible inventory file'
       inputs:
         targetType: 'inline'
         script: |
+          cd $(terraform_folder)
           VM_PUBLIC_IP=$(terraform output -raw vm_public_ip)
 
           if [ -z "$VM_PUBLIC_IP" ]; then
@@ -142,10 +143,8 @@ jobs:
 
           # Create inventory if missing
           if [ ! -f ansible/inventory ]; then
-           echo "[linux_servers]" > ansible/inventory
+            echo "[linux_servers]" > ansible/inventory
           fi
-          
-
 
           # Ensure group header exists
           if ! grep -q "^\[linux_servers\]" ansible/inventory; then
@@ -169,7 +168,7 @@ jobs:
           echo "📦 Installing Ansible (RHEL 8)..."
           sudo apt-get update
           sudo apt-get install -y ansible
-         
+        
           echo "===== Inventory file contents ====="
           cat ansible/inventory
           echo "=================================="
