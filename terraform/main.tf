@@ -19,11 +19,17 @@ provider "azurerm" {
   tenant_id       = var.tenant_id
 }
 
+# ===============================
+# 1. Resource Group
+# ===============================
 resource "azurerm_resource_group" "main" {
   name     = var.resource_group_name
   location = var.location
 }
 
+# ===============================
+# 2. Virtual Network
+# ===============================
 resource "azurerm_virtual_network" "main" {
   name                = "demo-vnet"
   address_space       = ["10.0.0.0/16"]
@@ -31,6 +37,9 @@ resource "azurerm_virtual_network" "main" {
   resource_group_name = azurerm_resource_group.main.name
 }
 
+# ===============================
+# 3. Subnet
+# ===============================
 resource "azurerm_subnet" "main" {
   name                 = "demo-subnet"
   resource_group_name  = azurerm_resource_group.main.name
@@ -38,22 +47,43 @@ resource "azurerm_subnet" "main" {
   address_prefixes     = ["10.0.1.0/24"]
 }
 
+# ===============================
+# 4. Network Security Group (NSG)
+# ===============================
 resource "azurerm_network_security_group" "main" {
   name                = "demo-nsg"
   location            = var.location
   resource_group_name = azurerm_resource_group.main.name
-
-  security_rule {
-    name                       = "Allow-SSH"
-    priority                   = 1001
-    direction                  = "Inbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "22"
-    source_address_prefix      = var.my_ip_address
-    destination_address_prefix = "*"
   }
+
+  # Allow SSH from DevOps agents (AzureCloud)
+resource "azurerm_network_security_rule" "allow_ssh_from_azurecloud" {
+  name                        = "Allow-SSH-From-AzureCloud"
+  priority                    = 1001
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "22"
+  source_address_prefix       = "AzureCloud"
+  destination_address_prefix  = "*"
+  resource_group_name         = azurerm_resource_group.main.name
+  network_security_group_name = azurerm_network_security_group.main.name
+}
+
+# Allow your IP for debugging (remove later)
+resource "azurerm_network_security_rule" "allow_ssh_from_gorav" {
+  name                        = "Allow-SSH-From-Gorav"
+  priority                    = 1002
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "22"
+  source_address_prefix       = "YOUR.IP.ADDRESS/32"  # 🔁 Replace with your IP
+  destination_address_prefix  = "*"
+  resource_group_name         = azurerm_resource_group.main.name
+  network_security_group_name = azurerm_network_security_group.main.name
 }
 
 resource "azurerm_subnet_network_security_group_association" "main" {
@@ -61,6 +91,10 @@ resource "azurerm_subnet_network_security_group_association" "main" {
   network_security_group_id = azurerm_network_security_group.main.id
 }
 
+
+# ===============================
+# 5. Public IP for the VM
+# ===============================
 resource "azurerm_public_ip" "main" {
   name                = "demo-public-ip"
   location            = var.location
@@ -69,6 +103,9 @@ resource "azurerm_public_ip" "main" {
   sku                 = "Standard"
 }
 
+# ===============================
+# 6. Network Interface Card (NIC)
+# ===============================
 resource "azurerm_network_interface" "main" {
   name                = "demo-nic"
   location            = var.location
@@ -82,9 +119,13 @@ resource "azurerm_network_interface" "main" {
   }
 }
 
+# ===============================
+# 7. Linux VM (RHEL)
+# ===============================
 resource "azurerm_linux_virtual_machine" "main" {
   name                = var.vm_name
   resource_group_name = azurerm_resource_group.main.name
+  network_interface_ids = [azurerm_network_interface.main.id]
   location            = var.location
   size                = "Standard_B1s"
   admin_username      = "azureuser"
@@ -110,4 +151,11 @@ resource "azurerm_linux_virtual_machine" "main" {
     version   = "latest"
   }
 }
+
+# ===============================
+# 8. Associate NSG to Subnet (optional but good practice)
+# ===============================
+resource "azurerm_subnet_network_security_group_association" "ssh_rules_subnet_assoc" {
+  subnet_id                 = azurerm_subnet.main.id
+  network_security_group_id = azurerm_network_security_group.main.id
 
