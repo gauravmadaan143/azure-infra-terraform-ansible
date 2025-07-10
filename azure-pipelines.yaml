@@ -93,6 +93,11 @@ jobs:
 
     - task: Bash@3
       displayName: 'Get VM public IP and prepare Ansible inventory'
+      env:
+        ARM_CLIENT_ID: $(ARM_CLIENT_ID)
+        ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
+        ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+        ARM_TENANT_ID: $(ARM_TENANT_ID)
       inputs:
         targetType: 'inline'
         script: |
