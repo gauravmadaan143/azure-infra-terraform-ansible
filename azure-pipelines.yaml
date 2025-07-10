@@ -172,10 +172,10 @@ jobs:
       inputs:
           targetType: 'inline'
           script: |
-            cd $(terraform_folder)
+            cd ansible
             echo "===== Inventory file contents ====="
             cat ansible/inventory || echo "⚠️ Inventory file not found!"
             echo "=================================="
 
             echo "🚀 Running Ansible Playbook..."
-            ansible-playbook -i ansible/inventory ../ansible/playbook.yml
+            ansible-playbook -i playbook.yml -i inventory
