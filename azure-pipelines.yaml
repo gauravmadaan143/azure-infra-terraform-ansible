@@ -99,44 +99,45 @@ jobs:
                 mkdir -p ~/.ssh
                 echo '$(SSH_PRIVATE_KEY)' > ~/.ssh/id_rsa
                 chmod 600 ~/.ssh/id_rsa
-                - task: Bash@3
-            displayName: 'Get VM public IP and prepare Ansible inventory'
-            inputs:
-              targetType: 'inline'
-              script: |
-                cd $(Build.SourcesDirectory)/$(terraform_folder)
-                VM_PUBLIC_IP=$(terraform output -raw vm_public_ip)
+            
+            - task: Bash@3
+              displayName: 'Get VM public IP and prepare Ansible inventory'
+              inputs:
+                targetType: 'inline'
+                script: |
+                 cd $(Build.SourcesDirectory)/$(terraform_folder)
+                 VM_PUBLIC_IP=$(terraform output -raw vm_public_ip)
 
-                if [ -z "$VM_PUBLIC_IP" ]; then
-                  echo "❌ ERROR: VM public IP is empty."
-                  exit 1
-                fi
+                 if [ -z "$VM_PUBLIC_IP" ]; then
+                   echo "❌ ERROR: VM public IP is empty."
+                   exit 1
+                 fi
 
-                echo "✅ VM Public IP is $VM_PUBLIC_IP"
+                 echo "✅ VM Public IP is $VM_PUBLIC_IP"
+ 
+                 mkdir -p $(Build.SourcesDirectory)/$(ansible_folder)
 
-                mkdir -p $(Build.SourcesDirectory)/$(ansible_folder)
+                 INVENTORY_FILE="$(Build.SourcesDirectory)/$(ansible_folder)/inventory"
 
-                INVENTORY_FILE="$(Build.SourcesDirectory)/$(ansible_folder)/inventory"
+                 echo "[linux_servers]" > $INVENTORY_FILE
+                 echo "demo-vm ansible_host=$VM_PUBLIC_IP ansible_user=azureuser ansible_ssh_private_key_file=~/.ssh/id_rsa" >> $INVENTORY_FILE
 
-                echo "[linux_servers]" > $INVENTORY_FILE
-                echo "demo-vm ansible_host=$VM_PUBLIC_IP ansible_user=azureuser ansible_ssh_private_key_file=~/.ssh/id_rsa" >> $INVENTORY_FILE
+                 echo "📋 Inventory content:"
+                 cat $INVENTORY_FILE
 
-                echo "📋 Inventory content:"
-                cat $INVENTORY_FILE
+            - task: Bash@3
+              displayName: 'Install Ansible on agent'
+              inputs:
+                targetType: 'inline'
+                script: |
+                 sudo apt-get update
+                 sudo apt-get install -y ansible
+                 ansible --version
 
-          - task: Bash@3
-            displayName: 'Install Ansible on agent'
-            inputs:
-              targetType: 'inline'
-              script: |
-                sudo apt-get update
-                sudo apt-get install -y ansible
-                ansible --version
-
-          - task: Bash@3
-            displayName: 'Run Ansible Playbook'
-            inputs:
-              targetType: 'inline'
-              script: |
-                cd $(Build.SourcesDirectory)/$(ansible_folder)
-                ansible-playbook -i inventory playbook.yml
+            - task: Bash@3
+              displayName: 'Run Ansible Playbook'
+              inputs:
+               targetType: 'inline'
+               script: |
+                 cd $(Build.SourcesDirectory)/$(ansible_folder)
+                 ansible-playbook -i inventory playbook.yml
