@@ -95,17 +95,21 @@ jobs:
           echo "[defaults]" > $(Build.SourcesDirectory)/$(ansible_folder)/ansible.cfg
           echo "host_key_checking = False" >> $(Build.SourcesDirectory)/$(ansible_folder)/ansible.cfg
 
+    - task: DownloadSecureFile@1
+      name: downloadKey
+      inputs:
+        secureFile: 'id_rsa_azure'
+
     - task: Bash@3
-      displayName: "Setup SSH private key for Ansible"
-      env:
-        SSH_PRIVATE_KEY: $(SSH_PRIVATE_KEY)
+      displayName: 'Use downloaded private key'
       inputs:
         targetType: 'inline'
         script: |
           mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          cp $(downloadKey.secureFilePath) ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ls -l ~/.ssh/id_rsa
+
 
     - task: Bash@3
       displayName: "Install Ansible"
