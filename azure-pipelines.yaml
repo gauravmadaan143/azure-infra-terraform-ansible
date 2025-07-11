@@ -131,24 +131,25 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ansible
           ansible --version
-
-    - task: Bash@3
-      displayName: 'Setup SSH private key for Ansible'
-      inputs:
-        targetType: 'inline'
-        script: |
-          mkdir -p ~/.ssh
-          cat
-          <<EOF > ~/.ssh/id_rsa
-            $(SSH_PRIVATE_KEY)
-             EOF
-          chmod 600 ~/.ssh/id_rsa
-          ls -l ~/.ssh/id_rsa  # Optional: show permissions for debugging
           
-    - task: Bash@3
-      displayName: 'Run Ansible Playbook'
-      inputs:
-        targetType: 'inline'
-        script: |
-          cd $(Build.SourcesDirectory)/$(ansible_folder)
-          ansible-playbook -i inventory playbook.yml
+              - task: Bash@3
+                displayName: 'Setup SSH private key for Ansible'
+                env:
+                  SSH_PRIVATE_KEY: $(SSH_PRIVATE_KEY)   # Make sure this is declared in pipeline variables as secret
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    mkdir -p ~/.ssh
+                    cat <<EOF > ~/.ssh/id_rsa
+              $(SSH_PRIVATE_KEY)
+              EOF
+                    chmod 600 ~/.ssh/id_rsa
+                    ls -l ~/.ssh/id_rsa
+
+              - task: Bash@3
+                displayName: 'Run Ansible Playbook'
+                inputs:
+                  targetType: 'inline'
+                  script: |
+                    cd $(Build.SourcesDirectory)/$(ansible_folder)
+                    ansible-playbook -i inventory playbook.yml
