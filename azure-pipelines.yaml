@@ -7,7 +7,7 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-- group: Terraform-SP-Creds   # Contains ARM_CLIENT_ID, ARM_CLIENT_SECRET, ARM_SUBSCRIPTION_ID, ARM_TENANT_ID
+- group: Terraform-SP-Creds   # Azure SP credentials
 - name: terraformVersion
   value: '1.6.6'
 - name: terraform_folder
@@ -21,9 +21,7 @@ variables:
 - name: vm_name
   value: 'demo-vm'
 - name: my_ip_address
-  value: '89.64.12.157/32'     # Your laptop IP for NSG SSH rule
-
-# SSH_PRIVATE_KEY should be stored as a secret pipeline variable in this group or separately
+  value: '89.64.12.157'
 
 jobs:
 - job: DeployInfra
@@ -50,28 +48,6 @@ jobs:
           terraform init
 
     - task: Bash@3
-      displayName: "Terraform Plan"
-      env:
-        ARM_CLIENT_ID: $(ARM_CLIENT_ID)
-        ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
-        ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
-        ARM_TENANT_ID: $(ARM_TENANT_ID)
-      inputs:
-        targetType: inline
-        script: |
-          cd $(terraform_folder)
-          terraform plan \
-            -var="location=$(location)" \
-            -var="resource_group_name=$(resource_group_name)" \
-            -var="vm_name=$(vm_name)" \
-            -var="ssh_public_key=$(ssh_public_key)" \
-            -var="my_ip_address=$(my_ip_address)" \
-            -var="client_id=$(ARM_CLIENT_ID)" \
-            -var="client_secret=$(ARM_CLIENT_SECRET)" \
-            -var="subscription_id=$(ARM_SUBSCRIPTION_ID)" \
-            -var="tenant_id=$(ARM_TENANT_ID)"
-
-    - task: Bash@3
       displayName: "Terraform Apply"
       env:
         ARM_CLIENT_ID: $(ARM_CLIENT_ID)
@@ -92,9 +68,8 @@ jobs:
             -var="client_secret=$(ARM_CLIENT_SECRET)" \
             -var="subscription_id=$(ARM_SUBSCRIPTION_ID)" \
             -var="tenant_id=$(ARM_TENANT_ID)"
-
     - task: Bash@3
-      displayName: 'Get VM public IP and prepare Ansible inventory'
+      displayName: "Prepare dynamic inventory"
       env:
         ARM_CLIENT_ID: $(ARM_CLIENT_ID)
         ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
@@ -104,52 +79,47 @@ jobs:
         targetType: 'inline'
         script: |
           cd $(Build.SourcesDirectory)/$(terraform_folder)
+
           VM_PUBLIC_IP=$(terraform output -raw vm_public_ip)
-
-          if [ -z "$VM_PUBLIC_IP" ]; then
-            echo "❌ ERROR: VM public IP is empty."
-            exit 1
-          fi
-
-          echo "✅ VM Public IP is $VM_PUBLIC_IP"
+          echo "Public IP: $VM_PUBLIC_IP"
 
           mkdir -p $(Build.SourcesDirectory)/$(ansible_folder)
-
           INVENTORY_FILE="$(Build.SourcesDirectory)/$(ansible_folder)/inventory"
 
           echo "[linux_servers]" > $INVENTORY_FILE
           echo "demo-vm ansible_host=$VM_PUBLIC_IP ansible_user=azureuser ansible_ssh_private_key_file=~/.ssh/id_rsa" >> $INVENTORY_FILE
 
-          echo "📋 Inventory content:"
+          echo "Generated Ansible inventory:"
           cat $INVENTORY_FILE
 
+          echo "[defaults]" > $(Build.SourcesDirectory)/$(ansible_folder)/ansible.cfg
+          echo "host_key_checking = False" >> $(Build.SourcesDirectory)/$(ansible_folder)/ansible.cfg
+
     - task: Bash@3
-      displayName: 'Install Ansible on agent'
+      displayName: "Setup SSH private key for Ansible"
+      env:
+        SSH_PRIVATE_KEY: $(SSH_PRIVATE_KEY)
+      inputs:
+        targetType: 'inline'
+        script: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ls -l ~/.ssh/id_rsa
+
+    - task: Bash@3
+      displayName: "Install Ansible"
       inputs:
         targetType: 'inline'
         script: |
           sudo apt-get update
           sudo apt-get install -y ansible
           ansible --version
-          
-              - task: Bash@3
-                displayName: 'Setup SSH private key for Ansible'
-                env:
-                  SSH_PRIVATE_KEY: $(SSH_PRIVATE_KEY)   # Make sure this is declared in pipeline variables as secret
-                inputs:
-                  targetType: 'inline'
-                  script: |
-                    mkdir -p ~/.ssh
-                    cat <<EOF > ~/.ssh/id_rsa
-              $(SSH_PRIVATE_KEY)
-              EOF
-                    chmod 600 ~/.ssh/id_rsa
-                    ls -l ~/.ssh/id_rsa
 
-              - task: Bash@3
-                displayName: 'Run Ansible Playbook'
-                inputs:
-                  targetType: 'inline'
-                  script: |
-                    cd $(Build.SourcesDirectory)/$(ansible_folder)
-                    ansible-playbook -i inventory playbook.yml
+    - task: Bash@3
+      displayName: "Run Ansible Playbook"
+      inputs:
+        targetType: 'inline'
+        script: |
+          cd $(Build.SourcesDirectory)/$(ansible_folder)
+          ansible-playbook -i inventory playbook.yml
