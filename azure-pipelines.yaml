@@ -7,7 +7,7 @@ pool:
   vmImage: 'ubuntu-latest'
 
 variables:
-- group: Terraform-SP-Creds   # Your SP secrets variable group
+- group: Terraform-SP-Creds   # Contains ARM_CLIENT_ID, ARM_CLIENT_SECRET, ARM_SUBSCRIPTION_ID, ARM_TENANT_ID
 - name: terraformVersion
   value: '1.6.6'
 - name: terraform_folder
@@ -21,8 +21,9 @@ variables:
 - name: vm_name
   value: 'demo-vm'
 - name: my_ip_address
-  value: '89.64.12.157'
-# Add your SSH_PRIVATE_KEY secret variable in pipeline library
+  value: '89.64.12.157/32'     # Your laptop IP for NSG SSH rule
+
+# SSH_PRIVATE_KEY should be stored as a secret pipeline variable in this group or separately
 
 jobs:
 - job: DeployInfra
@@ -131,9 +132,8 @@ jobs:
           sudo apt-get install -y ansible
           ansible --version
 
-    # <<< NEW STEP TO ADD: Prepare SSH private key on agent >>>
     - task: Bash@3
-      displayName: 'Prepare SSH private key'
+      displayName: 'Setup SSH private key for Ansible'
       env:
         SSH_PRIVATE_KEY: $(SSH_PRIVATE_KEY)
       inputs:
