@@ -132,17 +132,16 @@ jobs:
           sudo apt-get install -y ansible
           ansible --version
 
-    - task: Bash@3
-      displayName: 'Setup SSH private key for Ansible'
-      env:
-        SSH_PRIVATE_KEY: $(SSH_PRIVATE_KEY)
-      inputs:
-        targetType: 'inline'
-        script: |
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-
+          - task: Bash@3
+          displayName: 'Setup SSH private key for Ansible'
+          inputs:
+            targetType: 'inline'
+            script: |
+              mkdir -p ~/.ssh
+              cat <<EOF > ~/.ssh/id_rsa
+              $(SSH_PRIVATE_KEY)
+              EOF
+              chmod 600 ~/.ssh/id_rsa
     - task: Bash@3
       displayName: 'Run Ansible Playbook'
       inputs:
