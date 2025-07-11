@@ -56,28 +56,31 @@ resource "azurerm_network_security_group" "main" {
   resource_group_name = azurerm_resource_group.main.name
 }
 
-# Allow SSH from DevOps agents (temporarily set to allow all for testing)
-resource "azurerm_network_security_rule" "allow_ssh_from_any" {
-  name                        = "Allow-SSH-From-Any"
+# Allow SSH from Gorav's IP
+resource "azurerm_network_security_rule" "allow_ssh_from_gorav" {
+  name                        = "Allow-SSH-From-Gorav"
   priority                    = 1001
   direction                   = "Inbound"
   access                      = "Allow"
   protocol                    = "Tcp"
   source_port_range           = "*"
   destination_port_range      = "22"
-  source_address_prefix       = "*" # 🔁 Change back later to AzureCloud or YOUR IP
+  source_address_prefix       = var.my_ip_address
   destination_address_prefix  = "*"
   resource_group_name         = azurerm_resource_group.main.name
   network_security_group_name = azurerm_network_security_group.main.name
 }
 
+# ===============================
+# 5. Associate NSG to Subnet
+# ===============================
 resource "azurerm_subnet_network_security_group_association" "main" {
   subnet_id                 = azurerm_subnet.main.id
   network_security_group_id = azurerm_network_security_group.main.id
 }
 
 # ===============================
-# 5. Public IP for the VM
+# 6. Public IP for the VM
 # ===============================
 resource "azurerm_public_ip" "main" {
   name                = "demo-public-ip"
@@ -88,7 +91,7 @@ resource "azurerm_public_ip" "main" {
 }
 
 # ===============================
-# 6. Network Interface Card (NIC)
+# 7. Network Interface Card (NIC)
 # ===============================
 resource "azurerm_network_interface" "main" {
   name                = "demo-nic"
@@ -104,14 +107,14 @@ resource "azurerm_network_interface" "main" {
 }
 
 # ===============================
-# 7. Linux VM (RHEL)
+# 8. Linux VM (RHEL)
 # ===============================
 resource "azurerm_linux_virtual_machine" "main" {
-  name                = var.vm_name
-  resource_group_name = azurerm_resource_group.main.name
-  location            = var.location
-  size                = "Standard_B1s"
-  admin_username      = "azureuser"
+  name                  = var.vm_name
+  resource_group_name   = azurerm_resource_group.main.name
+  location              = var.location
+  size                  = "Standard_B1s"
+  admin_username        = "azureuser"
   network_interface_ids = [azurerm_network_interface.main.id]
   disable_password_authentication = true
 
