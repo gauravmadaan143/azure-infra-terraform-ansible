@@ -59,13 +59,28 @@ resource "azurerm_network_security_group" "main" {
 # Allow SSH from Gorav's IP
 resource "azurerm_network_security_rule" "allow_ssh_from_gorav" {
   name                        = "Allow-SSH-From-Gorav"
-  priority                    = 1001
+  priority                    = 1000
   direction                   = "Inbound"
   access                      = "Allow"
   protocol                    = "Tcp"
   source_port_range           = "*"
   destination_port_range      = "22"
-  source_address_prefix       = var.my_ip_address
+  source_address_prefix       = "0.0.0.0/0"
+  destination_address_prefix  = "*"
+  resource_group_name         = azurerm_resource_group.main.name
+  network_security_group_name = azurerm_network_security_group.main.name
+}
+
+# Allow SSH from Azure DevOps pipeline IPs (replace 0.0.0.0/0 with actual IP ranges for security)
+resource "azurerm_network_security_rule" "allow_ssh_from_azuredevops" {
+  name                        = "Allow-SSH-From-AzureDevOps"
+  priority                    = 1002
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "22"
+  source_address_prefix       = "0.0.0.0/0"
   destination_address_prefix  = "*"
   resource_group_name         = azurerm_resource_group.main.name
   network_security_group_name = azurerm_network_security_group.main.name
@@ -135,5 +150,13 @@ resource "azurerm_linux_virtual_machine" "main" {
     sku       = "8_8"
     version   = "latest"
   }
+}
+
+# ===============================
+# 9. Outputs
+# ===============================
+output "vm_public_ip" {
+  description = "Public IP of the Linux VM"
+  value       = azurerm_public_ip.main.ip_address
 }
 
