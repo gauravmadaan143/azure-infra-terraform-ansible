@@ -152,11 +152,3 @@ resource "azurerm_linux_virtual_machine" "main" {
   }
 }
 
-# ===============================
-# 9. Outputs
-# ===============================
-output "vm_public_ip" {
-  description = "Public IP of the Linux VM"
-  value       = azurerm_public_ip.main.ip_address
-}
-
