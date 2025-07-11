@@ -22,6 +22,7 @@ variables:
   value: 'demo-vm'
 - name: my_ip_address
   value: '89.64.12.157'
+# Add your SSH_PRIVATE_KEY secret variable in pipeline library
 
 jobs:
 - job: DeployInfra
@@ -121,7 +122,6 @@ jobs:
           echo "📋 Inventory content:"
           cat $INVENTORY_FILE
 
-  
     - task: Bash@3
       displayName: 'Install Ansible on agent'
       inputs:
@@ -131,7 +131,18 @@ jobs:
           sudo apt-get install -y ansible
           ansible --version
 
-  
+    # <<< NEW STEP TO ADD: Prepare SSH private key on agent >>>
+    - task: Bash@3
+      displayName: 'Prepare SSH private key'
+      env:
+        SSH_PRIVATE_KEY: $(SSH_PRIVATE_KEY)
+      inputs:
+        targetType: 'inline'
+        script: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
     - task: Bash@3
       displayName: 'Run Ansible Playbook'
       inputs:
