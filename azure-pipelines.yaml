@@ -1,39 +1,46 @@
+# Trigger pipeline on pushes to the main branch
 trigger:
   branches:
     include:
       - main
 
+# Use Ubuntu image for the pipeline agent
 pool:
   vmImage: 'ubuntu-latest'
 
+# Define global variables
 variables:
-- group: Terraform-SP-Creds   # Azure SP credentials
-- name: terraformVersion
-  value: '1.6.6'
-- name: terraform_folder
-  value: 'terraform'
-- name: ansible_folder
-  value: 'ansible'
-- name: location
-  value: 'westeurope'
-- name: resource_group_name
-  value: 'demo-rg'
-- name: vm_name
-  value: 'demo-vm'
-- name: my_ip_address
-  value: '89.64.12.157'
+  - group: Terraform-SP-Creds   # SP creds from Azure DevOps variable group
+  - name: terraformVersion
+    value: '1.6.6'
+  - name: terraform_folder
+    value: 'terraform'
+  - name: ansible_folder
+    value: 'ansible'
+  - name: location
+    value: 'westeurope'
+  - name: resource_group_name
+    value: 'demo-rg'
+  - name: vm_name
+    value: 'demo-vm'
+  - name: my_ip_address
+    value: '89.64.12.157'       # Your public IP to allow SSH
 
 jobs:
 - job: DeployInfra
   displayName: "Terraform + Ansible Deployment"
   steps:
+
+    # Checkout code from repo
     - checkout: self
 
+    # Install specific Terraform version
     - task: TerraformInstaller@1
       displayName: "Install Terraform"
       inputs:
         terraformVersion: "$(terraformVersion)"
 
+    # Terraform init with SP authentication
     - task: Bash@3
       displayName: "Terraform Init"
       env:
@@ -47,6 +54,7 @@ jobs:
           cd $(terraform_folder)
           terraform init
 
+    # Terraform apply to provision Azure resources including VM
     - task: Bash@3
       displayName: "Terraform Apply"
       env:
@@ -68,13 +76,10 @@ jobs:
             -var="client_secret=$(ARM_CLIENT_SECRET)" \
             -var="subscription_id=$(ARM_SUBSCRIPTION_ID)" \
             -var="tenant_id=$(ARM_TENANT_ID)"
+
+    # Create dynamic inventory file and ansible.cfg for the VM
     - task: Bash@3
-      displayName: "Prepare dynamic inventory"
-      env:
-        ARM_CLIENT_ID: $(ARM_CLIENT_ID)
-        ARM_CLIENT_SECRET: $(ARM_CLIENT_SECRET)
-        ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
-        ARM_TENANT_ID: $(ARM_TENANT_ID)
+      displayName: "Prepare Ansible Inventory"
       inputs:
         targetType: 'inline'
         script: |
@@ -89,41 +94,47 @@ jobs:
           echo "[linux_servers]" > $INVENTORY_FILE
           echo "demo-vm ansible_host=$VM_PUBLIC_IP ansible_user=azureuser ansible_ssh_private_key_file=~/.ssh/id_rsa" >> $INVENTORY_FILE
 
-          echo "Generated Ansible inventory:"
-          cat $INVENTORY_FILE
-
+          # Disable host key checking for Ansible to avoid manual confirmation prompts
           echo "[defaults]" > $(Build.SourcesDirectory)/$(ansible_folder)/ansible.cfg
           echo "host_key_checking = False" >> $(Build.SourcesDirectory)/$(ansible_folder)/ansible.cfg
 
+    # Download the private key securely from Azure DevOps library (Secure Files)
     - task: DownloadSecureFile@1
       name: downloadKey
+      displayName: "Download SSH Private Key"
       inputs:
         secureFile: 'id_rsa_azure'
 
+    # Move the private key into ~/.ssh with correct permissions
     - task: Bash@3
-      displayName: 'Use downloaded private key'
+      displayName: 'Set up SSH Private Key'
       inputs:
         targetType: 'inline'
         script: |
           mkdir -p ~/.ssh
           cp $(downloadKey.secureFilePath) ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ls -l ~/.ssh/id_rsa
 
-
+    # Optional: Debug inventory and SSH key presence
     - task: Bash@3
-      displayName: "Install Ansible"
+      displayName: 'Debug Inventory & SSH'
       inputs:
         targetType: 'inline'
         script: |
-          sudo apt-get update
-          sudo apt-get install -y ansible
-          ansible --version
+          ls -l ~/.ssh
+          ls -l $(Build.SourcesDirectory)/$(ansible_folder)
+          cat $(Build.SourcesDirectory)/$(ansible_folder)/inventory
 
+    # Run Ansible using Docker (no Ansible installation needed on the agent)
     - task: Bash@3
-      displayName: "Run Ansible Playbook"
+      displayName: 'Run Ansible Playbook inside Docker (Fast)'
       inputs:
         targetType: 'inline'
         script: |
           cd $(Build.SourcesDirectory)/$(ansible_folder)
-          ansible-playbook -i inventory playbook.yml
+          docker run --rm \
+            -v ~/.ssh:/root/.ssh:ro \
+            -v "$(pwd)":/ansible \
+            -w /ansible \
+            ghcr.io/ansible/ansible-runner:latest \
+            ansible-playbook -i inventory playbook.yml
