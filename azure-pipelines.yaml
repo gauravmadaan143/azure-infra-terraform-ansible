@@ -124,6 +124,7 @@ jobs:
           ls -l ~/.ssh
           ls -l $(Build.SourcesDirectory)/$(ansible_folder)
           cat $(Build.SourcesDirectory)/$(ansible_folder)/inventory
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no azureuser@$VM_PUBLIC_IP "echo Connected!"
 
     # Run Ansible using Docker (no Ansible installation needed on the agent)
     - task: Bash@3
