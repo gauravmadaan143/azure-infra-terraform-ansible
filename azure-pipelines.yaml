@@ -101,6 +101,18 @@ jobs:
         echo "Inventory:"
         cat $INVENTORY_FILE
 
+    - task: Bash@3
+      displayName: "Check Ansible Inventory & IP"
+      inputs:
+       targetType: 'inline'
+       script: |
+        echo "----- Inventory -----"
+        cat $(Build.SourcesDirectory)/$(ansible_folder)/inventory
+
+        echo "----- SSH Key -----"
+        ls -l ~/.ssh/id_rsa
+        cat ~/.ssh/id_rsa | head -n 2
+
     # Download the private key securely from Azure DevOps library (Secure Files)
     - task: DownloadSecureFile@1
       name: downloadKey
