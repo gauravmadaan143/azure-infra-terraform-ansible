@@ -127,14 +127,14 @@ jobs:
 
     # Run Ansible using Docker (no Ansible installation needed on the agent)
     - task: Bash@3
-      displayName: 'Run Ansible Playbook inside Docker (Fast)'
+      displayName: 'Run Ansible Playbook inside Docker (Public Image)'
       inputs:
         targetType: 'inline'
         script: |
           cd $(Build.SourcesDirectory)/$(ansible_folder)
           docker run --rm \
             -v ~/.ssh:/root/.ssh:ro \
-            -v "$(pwd)":/ansible \
-            -w /ansible \
-            ghcr.io/ansible/ansible-runner:latest \
+            -v "$(pwd)":/runner/project \
+            -w /runner/project \
+            ansible/ansible-runner \
             ansible-playbook -i inventory playbook.yml
