@@ -81,22 +81,25 @@ jobs:
     - task: Bash@3
       displayName: "Prepare Ansible Inventory"
       inputs:
-        targetType: 'inline'
-        script: |
-          cd $(Build.SourcesDirectory)/$(terraform_folder)
+       targetType: 'inline'
+       script: |
+        cd $(Build.SourcesDirectory)/$(terraform_folder)
 
-          VM_PUBLIC_IP=$(terraform output -raw vm_public_ip)
-          echo "Public IP: $VM_PUBLIC_IP"
+        VM_PUBLIC_IP=$(terraform output -raw vm_public_ip)
+        echo "Public IP: $VM_PUBLIC_IP"
 
-          mkdir -p $(Build.SourcesDirectory)/$(ansible_folder)
-          INVENTORY_FILE="$(Build.SourcesDirectory)/$(ansible_folder)/inventory"
+        mkdir -p $(Build.SourcesDirectory)/$(ansible_folder)
+        INVENTORY_FILE="$(Build.SourcesDirectory)/$(ansible_folder)/inventory"
 
-          echo "[linux_servers]" > $INVENTORY_FILE
-          echo "$VM_PUBLIC_IP ansible_user=azureuser ansible_ssh_private_key_file=~/.ssh/id_rsa" >> $INVENTORY_FILE
-          
-          # Disable host key checking for Ansible to avoid manual confirmation prompts
-          echo "[defaults]" > $(Build.SourcesDirectory)/$(ansible_folder)/ansible.cfg
-          echo "host_key_checking = False" >> $(Build.SourcesDirectory)/$(ansible_folder)/ansible.cfg
+        echo "[linux_servers]" > $INVENTORY_FILE
+        echo "demo-vm ansible_host=$VM_PUBLIC_IP ansible_user=azureuser ansible_ssh_private_key_file=~/.ssh/id_rsa" >> $INVENTORY_FILE
+
+        # Disable host key checking for Ansible to avoid manual confirmation prompts
+        echo "[defaults]" > $(Build.SourcesDirectory)/$(ansible_folder)/ansible.cfg
+        echo "host_key_checking = False" >> $(Build.SourcesDirectory)/$(ansible_folder)/ansible.cfg
+
+        echo "Inventory:"
+        cat $INVENTORY_FILE
 
     # Download the private key securely from Azure DevOps library (Secure Files)
     - task: DownloadSecureFile@1
